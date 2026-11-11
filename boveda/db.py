@@ -34,6 +34,18 @@ CREATE TABLE IF NOT EXISTS mensajes (
 
 CREATE INDEX IF NOT EXISTS idx_mensajes_destinatario ON mensajes(destinatario_id);
 CREATE INDEX IF NOT EXISTS idx_mensajes_remitente ON mensajes(remitente_id);
+
+CREATE TABLE IF NOT EXISTS compartidos (
+    id          TEXT PRIMARY KEY,
+    mensaje_id  TEXT NOT NULL REFERENCES mensajes(id) ON DELETE CASCADE,
+    token_hash  TEXT NOT NULL UNIQUE,
+    creado_por  TEXT NOT NULL REFERENCES usuarios(id),
+    creado_en   TEXT NOT NULL,
+    expira_en   TEXT NOT NULL,
+    revocado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_compartidos_mensaje ON compartidos(mensaje_id);
 """
 
 

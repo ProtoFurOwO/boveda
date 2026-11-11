@@ -77,6 +77,18 @@ def obtener(db, clave: bytes, usuario_id: str, mensaje_id: str) -> Mensaje:
     return _leer(clave, fila)
 
 
+def obtener_por_id(db, clave: bytes, mensaje_id: str) -> Mensaje:
+    """Carga un mensaje sin comprobar participantes. Solo para enlaces compartidos.
+
+    La autorización la da el token del enlace; esta función no debe usarse en rutas
+    autenticadas normales.
+    """
+    fila = db.execute(_CONSULTA + " WHERE m.id = ?", (mensaje_id,)).fetchone()
+    if fila is None:
+        raise NoEncontrado("El mensaje no existe")
+    return _leer(clave, fila)
+
+
 def enviar(
     db, clave: bytes, remitente_id: str, destinatario_nombre: str, asunto: str, cuerpo: str, contrasena: str
 ) -> str:

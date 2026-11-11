@@ -79,12 +79,20 @@
   </dl>
   <p class="ayuda">La huella identifica la clave sin revelarla. Si la clave cambia, los mensajes existentes no se podrán leer.</p>
 
+  <h2>Enlaces compartidos</h2>
+  <p class="ayuda">
+    Compartir un mensaje crea una URL <code>/p/&lt;token&gt;</code> de solo lectura. El token tiene 256 bits,
+    se muestra una sola vez y en la base solo se guarda su hash SHA-256. Caduca a los 7 días y se puede revocar.
+    Cualquiera que tenga el enlace puede leer el mensaje; no permite editarlo ni firmar como el autor.
+  </p>
+
   <h2>Límites conocidos</h2>
   <ul class="lista">
     <li>Quien tenga la clave maestra puede leer todos los mensajes. El cifrado protege los datos en reposo, no convierte a Bóveda en un sistema de extremo a extremo.</li>
     <li>Si olvidas tu contraseña no podrás firmar mensajes, porque tu llave privada no se puede recuperar.</li>
-    <li>Eliminar un mensaje lo borra para el remitente y para el destinatario.</li>
+    <li>Eliminar un mensaje lo borra para el remitente y para el destinatario, y también invalida sus enlaces compartidos.</li>
     <li>El remitente o el destinatario pueden descargar un comprobante antes de borrarlo; ese comprobante conserva la prueba del texto original.</li>
+    <li>Un enlace compartido es un secreto portador: quien lo tenga puede leer el mensaje. No lo publiques ni lo reenvíes sin querer.</li>
     <li>La aplicación corre en HTTP local. En un servidor real, pon TLS delante y activa <code>BOVEDA_COOKIES_SEGURAS=1</code>.</li>
   </ul>
 </article>

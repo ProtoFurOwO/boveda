@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sello %}
+{% block titulo %}{{ enlace.mensaje.asunto }}{% endblock %}
+{% block contenido %}
+<div class="compartido">
+  <p class="compartido__aviso">Enlace compartido de solo lectura. Cualquiera que lo tenga puede ver este mensaje.</p>
+
+  <article class="hoja hoja--mensaje">
+    <header class="mensaje__cabecera">
+      <div>
+        <h1>{{ enlace.mensaje.asunto }}</h1>
+        <p class="mensaje__meta">
+          De {{ enlace.mensaje.remitente }} para {{ enlace.mensaje.destinatario }}.
+          Enviado el {{ enlace.mensaje.creado_en|fecha }}.
+        </p>
+      </div>
+      {{ sello(enlace.mensaje.estado_firma, grande=True, animado=(enlace.mensaje.estado_firma == 'valida')) }}
+    </header>
+
+    {% if enlace.mensaje.descifrable %}
+      <div class="mensaje__texto">{{ enlace.mensaje.cuerpo }}</div>
+    {% else %}
+      <p class="aviso aviso--error">{{ enlace.mensaje.motivo_firma }}</p>
+    {% endif %}
+
+    {% if enlace.mensaje.estado_firma == 'invalida' and enlace.mensaje.descifrable %}
+      <p class="aviso aviso--error">
+        La firma no es válida: el contenido cambió después de firmarse. No lo tomes como auténtico.
+      </p>
+    {% elif enlace.mensaje.estado_firma == 'sin_firma' %}
+      <p class="aviso aviso--error">Este mensaje no tiene firma.</p>
+    {% endif %}
+
+    <footer class="compartido__pie">
+      <p class="muted">Compartido por {{ enlace.creado_por }}. Este enlace vence el {{ enlace.expira_en|fecha }}.</p>
+      <p class="muted">Solo lectura: desde aquí no se puede editar ni firmar.</p>
+    </footer>
+  </article>
+</div>
+{% endblock %}

@@ -22,6 +22,7 @@ Bóveda es una aplicación de mensajería entre usuarios. Protege los mensajes f
 | `boveda/servicios/usuarios.py` | Alta, autenticación y desbloqueo de la llave de firma |
 | `boveda/servicios/mensajes.py` | Cifrado al enviar, descifrado al leer, firma y control de acceso |
 | `boveda/servicios/comprobantes.py` | Formato del mensaje firmado y validación de comprobantes |
+| `boveda/servicios/compartidos.py` | Enlaces públicos con token, caducidad y revocación |
 
 La capa de servicios no depende de Flask. Eso permite probar la criptografía sin levantar un servidor.
 
@@ -124,14 +125,31 @@ Un comprobante es el payload más la firma, la clave pública del remitente y su
 
 En la verificación pública de la aplicación, la clave de confianza es la registrada en la tabla de usuarios para el remitente. Por eso esa página sirve para comprobantes de la misma instalación. Si el comprobante viene de otra instalación, el remitente no estará registrado allí: se usa `scripts/verificar_comprobante.py` con la clave pública del remitente como fuente de confianza.
 
-## 6. Contraseñas (scrypt)
+## 6. Enlaces compartidos
+
+El remitente o el destinatario pueden crear un enlace público de solo lectura:
+
+1. `crear_enlace` genera un token con `secrets.token_urlsafe(32)` (256 bits).
+2. En la base se guarda `sha256(token)`, no el token. El token se muestra una sola vez.
+3. El enlace caduca a los 7 días y se puede revocar (`revocado_en`).
+4. `resolver_enlace` busca por hash, comprueba que no esté revocado ni caducado y carga el mensaje con `mensajes.obtener_por_id`. La autorización la da el token.
+5. La página `/p/<token>` descifra y verifica la firma; es de solo lectura. No permite editar ni firmar.
+6. Si el mensaje se elimina, `ON DELETE CASCADE` borra sus enlaces.
+7. Las respuestas llevan `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow` y `Cache-Control: no-store`. Un token inválido, caducado o revocado responde 404.
+8. El enlace es un secreto portador: quien lo tenga puede leer. No se indexa, no se lista y no se usa el ID del mensaje en la URL.
+
+### Alteración de un mensaje compartido
+
+La página vuelve a descifrar y verificar en cada visita. Si alguien con la clave maestra cambia el texto y lo vuelve a cifrar, el enlace muestra *Alterado* y una advertencia. Si copia el cifrado a otro mensaje, el AAD no coincide y no se puede descifrar. El comprobante descargado antes conserva la prueba del texto original.
+
+## 7. Contraseñas (scrypt)
 
 - Parámetros: N=2¹⁷, r=8, p=1, 32 bytes de salida, sal de 16 bytes por usuario. Son los valores que recomienda OWASP. En la máquina de desarrollo, una derivación tarda unos 0.36 s.
 - Formato del hash: `scrypt$<N>$<r>$<p>$<sal>$<hash>`. Los parámetros van en el hash para poder subirlos en el futuro.
 - Hay dos derivaciones independientes con sales distintas: una para verificar el inicio de sesión y otra para la KEK. El hash nunca se usa como clave.
 - Si el usuario no existe, el inicio de sesión calcula igualmente un hash señuelo. Así el tiempo de respuesta no revela si la cuenta existe.
 
-## 7. Gestión de llaves
+## 8. Gestión de llaves
 
 ### Clave maestra
 
@@ -157,7 +175,7 @@ Sin la clave maestra no se pueden leer los mensajes. Respáldala fuera del proye
 - Recuperación de contraseñas. Como la llave privada depende de la contraseña, un usuario que la olvida ya no puede firmar mensajes nuevos. Los comprobantes descargados antes siguen verificándose con su clave pública.
 - Un HSM o un KMS en la nube. El código los permitiría: solo habría que cambiar la función `cargar_clave_maestra`.
 
-## 8. Modelo de amenazas
+## 9. Modelo de amenazas
 
 | Amenaza | Qué pasaría | Mitigación | Límite |
 |---|---|---|---|
@@ -168,6 +186,10 @@ Sin la clave maestra no se pueden leer los mensajes. Respáldala fuera del proye
 | Falsificar una firma sin conocer la contraseña | El atacante quiere enviar como otro usuario | La llave privada solo se abre con la contraseña | Quien conozca la contraseña del remitente puede firmar |
 | Comprobante falso con una llave propia | El verificador ve una firma válida | La verificación pública exige que la clave coincida con la registrada del remitente | Sin la aplicación, el verificador debe conseguir la clave del remitente por otra vía |
 | Tercer usuario pide un mensaje ajeno por su identificador (IDOR) | Querría leer un mensaje que no es suyo | Todas las consultas filtran por remitente o destinatario. Responde 404. | Ninguno para este caso |
+| Adivinar un enlace compartido | Querría abrir un mensaje ajeno probando IDs o tokens | Token de 256 bits, el ID del mensaje no aparece en la URL, 404 para cualquier token inválido, no hay listado de enlaces | Si el enlace se filtra, quien lo tenga puede leer el mensaje |
+| Enlace público filtrado o indexado | El mensaje se vuelve público | Token aleatorio, caducidad de 7 días, revocación, `noindex`, `no-referrer`, `no-store` | Es un secreto portador: si se reenvía, no se puede impedir la lectura; hay que revocarlo |
+| Enlace de un mensaje eliminado | Seguir leyendo después de borrar | `ON DELETE CASCADE`; el enlace deja de existir | Ninguno para este caso |
+| Alteración de un mensaje ya compartido | El visitante del enlace ve contenido falso | Se descifra y verifica en cada visita; sello *Alterado* y advertencia | Si el atacante controla la base y borra la firma, el mensaje queda *Sin firma*; el comprobante previo conserva la prueba |
 | Fuga de la clave maestra | Se descifran todos los mensajes y se pueden alterar | La clave vive fuera del código y de la base de datos, con permisos restringidos | Una sola clave raíz. No hay rotación. El servidor puede leer los mensajes: es cifrado en reposo, no extremo a extremo. |
 | Fuerza bruta contra el inicio de sesión | Intentos repetidos de contraseña | scrypt hace cada intento costoso | No hay límite de intentos ni bloqueo temporal |
 | Inyección de scripts (XSS) | Código ajeno se ejecuta en el navegador | Autoescape de Jinja2. CSP sin scripts en línea. | Ninguno para este caso |
@@ -177,7 +199,7 @@ Sin la clave maestra no se pueden leer los mensajes. Respáldala fuera del proye
 | Enumeración de usuarios | Saber qué cuentas existen | El inicio de sesión tarda lo mismo para usuarios inexistentes | El formulario de mensaje nuevo muestra los usuarios registrados como posibles destinatarios |
 | Eliminación de un mensaje | Perder la prueba del contenido | El remitente o el destinatario pueden descargar el comprobante antes de borrarlo | Borrar elimina el mensaje para ambos; solo el comprobante externo conserva la prueba |
 
-## 9. Decisiones y alternativas
+## 10. Decisiones y alternativas
 
 | Decisión | Alternativa descartada | Motivo |
 |---|---|---|
@@ -186,19 +208,23 @@ Sin la clave maestra no se pueden leer los mensajes. Respáldala fuera del proye
 | Una llave de firma por usuario | Una sola llave del servidor | La firma prueba autoría, no solo que el sistema emitió el mensaje |
 | Llave privada cifrada con la contraseña | Llave privada cifrada solo con la clave maestra | Quien tenga la clave maestra no puede firmar como el usuario sin conocer su contraseña |
 | Mensajes inmutables | Permitir editar | Un mensaje editado dejaría de ser una prueba de lo que se dijo; para corregir se envía otro |
+| Enlace público con token y hash en la base | Guardar el token o usar el ID del mensaje en la URL | El token no queda en la base, el ID no se expone y el enlace se puede revocar |
+| Enlaces de 7 días y revocables | URL pública permanente | Reduce la ventana de exposición y permite cortar el acceso |
+| Página pública de solo lectura | Compartir solo con una cuenta concreta | Cualquiera con el enlace puede verlo sin registro; es una decisión explícita del usuario |
 | Cookie de sesión firmada por Flask | JWT firmado con EdDSA | Un JWT sería un tercer mecanismo fuera del alcance. La sesión ya está firmada y expira. |
 | Clave de sesión derivada con HKDF | Variable de entorno aparte para `SECRET_KEY` | Una sola raíz de confianza: la clave maestra |
 | waitress como servidor | Servidor de desarrollo de Flask | waitress es un servidor WSGI de producción que funciona en Windows, Linux y macOS |
 | SQLite | PostgreSQL | Suficiente para la práctica. La capa de acceso está aislada en `db.py` y los servicios. |
 
-## 10. Verificación
+## 11. Verificación
 
-- **Pruebas automáticas:** 44 pruebas con `python -m pytest`. Cubren cifrado, firma, claves, servicios, comprobantes y el flujo web.
-- **Demostración en consola:** `python scripts/demostracion.py` recorre el envío entre dos usuarios con una base y una clave temporales.
+- **Pruebas automáticas:** 59 pruebas con `python -m pytest`. Cubren cifrado, firma, claves, servicios, comprobantes, enlaces compartidos y el flujo web.
+- **Demostración en consola:** `python scripts/demostracion.py` recorre el envío entre dos usuarios, el comprobante, el enlace público, la alteración, la revocación y el trasplante de cifrado con una base y una clave temporales.
 - **Demostración en la aplicación:** los scripts `manipular_mensaje.py` y `verificar_comprobante.py` simulan ataques sobre la base real y sobre comprobantes.
 - **Revisión visual:** se recorrieron la bandeja, el envío y el mensaje firmado en un navegador. La alteración y la verificación pública se cubren con las pruebas automáticas.
+- **Revisión del enlace público:** se comprobó por HTTP el estado 200, las cabeceras de privacidad, la alteración y la revocación; `tests/test_compartidos.py` cubre el resto.
 
-## 11. Referencias
+## 12. Referencias
 
 - NIST SP 800-38D: *Recommendation for Block Cipher Modes of Operation: Galois/Counter Mode (GCM)*.
 - RFC 8032: *Edwards-Curve Digital Signature Algorithm (EdDSA)*.

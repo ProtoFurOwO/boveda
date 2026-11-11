@@ -52,6 +52,7 @@ La primera vez que arranca, Bóveda genera la clave maestra en `secretos/clave_m
 5. Beto abre el mensaje: Bóveda lo descifra y verifica la firma con la llave pública de Ana. El sello dice **Firmado**.
 6. Beto descarga un **comprobante** (.json) con el texto firmado. Cualquiera puede verificarlo en *Verificar comprobante* de esta instalación sin cuenta. Si el comprobante viene de otra instalación, se verifica con `scripts/verificar_comprobante.py` y la clave pública del remitente.
 7. Si alguien cambia el mensaje en la base de datos, el sello pasa a **Alterado**.
+8. Si quieres, crea un **enlace público** de solo lectura para que otra persona vea el mensaje sin cuenta. Caduca en 7 días y se puede revocar.
 
 ## Recorrido de demostración
 
@@ -83,11 +84,55 @@ La primera vez que arranca, Bóveda genera la clave maestra en `secretos/clave_m
 
    Devuelve `[OK]` con código de salida 0. Si editas el JSON, devuelve `[FALLO]` con código 1.
 
+8. En el detalle del mensaje, pulsa **Crear enlace público**. Copia el enlace (se muestra una sola vez), ábrelo en una ventana privada y verás el mensaje en solo lectura. Caduca en 7 días y puedes revocarlo.
+
 Para ver el flujo completo en consola, sin tocar tus datos reales:
 
 ```bash
 python scripts/demostracion.py
 ```
+
+## Compartir un mensaje
+
+En el detalle de un mensaje, el remitente o el destinatario pueden pulsar **Crear enlace público**. Bóveda genera una URL como:
+
+```text
+http://127.0.0.1:5000/p/BPgmESoNZ3NWnPMwoZQPWfcXlbVVXYzXjhQaVMNAXgU
+```
+
+- El enlace es de **solo lectura**: muestra el asunto, el texto y el sello de firma.
+- No hace falta cuenta para abrirlo. Cualquiera que tenga la URL puede leer el mensaje.
+- El **token** tiene 256 bits aleatorios. En la base de datos se guarda solo su **hash SHA-256**, no el token.
+- El token se muestra **una sola vez**, al crearlo. Si lo pierdes, revoca ese enlace y crea otro.
+- Caduca a los **7 días** y se puede **revocar** desde el mismo panel.
+- Si el mensaje se elimina, sus enlaces dejan de funcionar.
+- Las respuestas de `/p/<token>` llevan `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow` y `Cache-Control: no-store`.
+- Un token inválido, caducado o revocado responde **404**, igual que uno que no existe. No hay IDs de mensaje en la URL y no se pueden listar enlaces.
+
+### Demostración de alteración
+
+Crea un enlace y ábrelo en una ventana privada. Luego:
+
+```bash
+# Cambia el texto con la clave maestra
+python scripts/manipular_mensaje.py <id-del-mensaje> llave "La clave es 0000."
+
+# Recarga el enlace público: sello Alterado y advertencia
+```
+
+También puedes mover el cifrado de un mensaje a otro:
+
+```bash
+python scripts/manipular_mensaje.py <id-destino> trasplantar <id-origen>
+```
+
+El enlace del destino muestra **Alterado** y no puede descifrar el contenido, porque los datos asociados de AES-GCM incluyen el remitente, el destinatario, el ID del mensaje y el campo. El mensaje original sigue válido.
+
+Prueba también:
+
+- cambiar un carácter del token → **404**;
+- revocar el enlace y recargar → **404**;
+- abrir `/mensajes/<id>` sin ser remitente ni destinatario → **404** o login (el enlace es la única vía pública).
 
 ## Mecanismos criptográficos
 
@@ -141,9 +186,9 @@ La clave maestra se busca primero en la variable de entorno y después en el arc
 - **Servidor:** genera una clave con `python scripts/generar_clave_maestra.py` y guárdala en el gestor de secretos del servicio (variables del servicio, Azure Key Vault, AWS Secrets Manager o HashiCorp Vault). No la dejes en disco.
 - **Estado actual:** la página *Seguridad* muestra de dónde se cargó la clave y su huella. Nunca muestra la clave.
 
-## Publicar y compartir
+## Publicar el proyecto
 
-Para que otra persona lo vea:
+Para que otra persona vea el código:
 
 1. Crea un repositorio vacío en GitHub.
 2. En la carpeta del proyecto:
@@ -193,7 +238,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Las 44 pruebas cubren las primitivas (cifrado, firma y manejo de claves), los servicios (usuarios, envío de mensajes, comprobantes y alteraciones) y el flujo web (sesión, CSRF, cabeceras y verificación pública).
+Las 59 pruebas cubren las primitivas (cifrado, firma y manejo de claves), los servicios (usuarios, envío de mensajes, comprobantes, enlaces compartidos y alteraciones) y el flujo web (sesión, CSRF, cabeceras, verificación pública y enlaces).
 
 ## Estructura del proyecto
 
@@ -211,8 +256,9 @@ boveda/
     usuarios.py
     mensajes.py
     comprobantes.py
+    compartidos.py       enlaces públicos con token, caducidad y revocación
   web/                    rutas, sesión, CSRF y cabeceras HTTP
-  templates/ static/      interfaz
+  templates/ static/      interfaz (incluye compartido.html)
 scripts/                  demostración y herramientas de consola
 tests/                    pruebas automáticas
 docs/criptografia.md      diseño, modelo de amenazas y decisiones
@@ -228,6 +274,7 @@ Esta es una práctica académica. Para usarla en producción falta trabajo:
 - No hay rotación de la clave maestra ni recuperación de contraseñas. Si olvidas tu contraseña, no puedes firmar.
 - No hay estados de lectura ni adjuntos.
 - Todos los usuarios registrados aparecen como posibles destinatarios; no hay lista de contactos.
+- Un enlace compartido es un secreto portador: cualquiera que lo tenga puede leer el mensaje. Caduca a los 7 días y se puede revocar, pero si se filtra antes, hay que revocarlo.
 
 El modelo de amenazas completo está en [docs/criptografia.md](docs/criptografia.md).
 

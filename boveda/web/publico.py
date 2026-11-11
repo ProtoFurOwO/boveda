@@ -2,12 +2,12 @@
 
 import json
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from boveda.criptografia import asimetrico
 from boveda.db import obtener_db
-from boveda.servicios import comprobantes, usuarios
-from boveda.servicios.comun import ErrorServicio
+from boveda.servicios import compartidos, comprobantes, usuarios
+from boveda.servicios.comun import ErrorServicio, NoEncontrado
 
 bp = Blueprint("publico", __name__)
 
@@ -26,6 +26,15 @@ def verificar():
         except ErrorServicio as e:
             flash(str(e), "error")
     return render_template("verificar.html", resultado=resultado)
+
+
+@bp.get("/p/<token>")
+def compartido(token: str):
+    try:
+        enlace = compartidos.resolver_enlace(obtener_db(), current_app.config["CLAVE_DATOS"], token)
+    except NoEncontrado:
+        abort(404)
+    return render_template("compartido.html", enlace=enlace)
 
 
 @bp.get("/seguridad")

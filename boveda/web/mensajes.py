@@ -2,9 +2,10 @@
 
 import json
 
-from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 
 from boveda.db import obtener_db
+from boveda.servicios import compartidos as servicio_compartidos
 from boveda.servicios import mensajes as servicio
 from boveda.servicios import usuarios
 from boveda.servicios.comun import ErrorServicio, NoEncontrado
@@ -70,9 +71,49 @@ def nuevo():
 @bp.get("/<mensaje_id>")
 @requiere_sesion
 def detalle(mensaje_id: str):
-    mensaje = _mensaje(mensaje_id)
+    return _render_detalle(_mensaje(mensaje_id))
+
+
+@bp.post("/<mensaje_id>/compartir")
+@requiere_sesion
+def compartir(mensaje_id: str):
+    try:
+        enlace = servicio_compartidos.crear_enlace(obtener_db(), mensaje_id, g.usuario["id"])
+    except NoEncontrado:
+        abort(404)
+    session["enlace_nuevo"] = {
+        "mensaje_id": mensaje_id,
+        "url": url_for("publico.compartido", token=enlace.token, _external=True),
+        "expira_en": enlace.expira_en,
+    }
+    flash("Enlace creado. Cópialo ahora: no se volverá a mostrar.", "ok")
+    return redirect(url_for("mensajes.detalle", mensaje_id=mensaje_id))
+
+
+@bp.post("/<mensaje_id>/compartir/<enlace_id>/revocar")
+@requiere_sesion
+def revocar(mensaje_id: str, enlace_id: str):
+    try:
+        servicio_compartidos.revocar_enlace(obtener_db(), mensaje_id, enlace_id, g.usuario["id"])
+    except NoEncontrado:
+        abort(404)
+    flash("Enlace revocado", "info")
+    return redirect(url_for("mensajes.detalle", mensaje_id=mensaje_id))
+
+
+def _render_detalle(mensaje: servicio.Mensaje):
+    enlace_nuevo = session.pop("enlace_nuevo", None)
+    if enlace_nuevo and enlace_nuevo.get("mensaje_id") != mensaje.id:
+        enlace_nuevo = None
+    enlaces = servicio_compartidos.listar_enlaces(obtener_db(), mensaje.id, g.usuario["id"])
     responder_a = mensaje.destinatario if mensaje.remitente == g.usuario["nombre"] else mensaje.remitente
-    return render_template("mensajes/detalle.html", mensaje=mensaje, responder_a=responder_a)
+    return render_template(
+        "mensajes/detalle.html",
+        mensaje=mensaje,
+        responder_a=responder_a,
+        enlaces=enlaces,
+        enlace_nuevo=enlace_nuevo,
+    )
 
 
 @bp.post("/<mensaje_id>/eliminar")

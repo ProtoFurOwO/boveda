@@ -53,6 +53,48 @@
     </section>
 
     <section class="panel">
+      <h2>Compartir</h2>
+      {% if enlace_nuevo %}
+        <div class="enlace-nuevo">
+          <p class="ayuda">Copia este enlace ahora. No se volverá a mostrar.</p>
+          <div class="enlace-caja">
+            <input class="input mono" type="text" readonly value="{{ enlace_nuevo.url }}" aria-label="Enlace público">
+            <button class="boton boton--secundario" type="button" data-copiar="{{ enlace_nuevo.url }}">Copiar</button>
+          </div>
+          <p class="ayuda">Vence el {{ enlace_nuevo.expira_en|fecha }}.</p>
+        </div>
+      {% else %}
+        <p class="ayuda">
+          Crea un enlace de solo lectura para que otra persona vea este mensaje sin cuenta.
+          Caduca en 7 días y puedes revocarlo cuando quieras.
+        </p>
+        <form method="post" action="{{ url_for('mensajes.compartir', mensaje_id=mensaje.id) }}" class="formulario">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="boton boton--secundario boton--ancho" type="submit">Crear enlace público</button>
+        </form>
+      {% endif %}
+      {% if enlaces %}
+        <ul class="enlaces">
+          {% for e in enlaces %}
+            <li class="enlaces__fila">
+              <span class="enlace-estado {{ 'enlace-estado--activo' if e.activo else 'enlace-estado--inactivo' }}">
+                {{ 'Activo' if e.activo else 'Caducado o revocado' }}
+              </span>
+              <span class="muted">Vence {{ e.expira_en|fecha }}</span>
+              {% if e.activo %}
+                <form method="post" action="{{ url_for('mensajes.revocar', mensaje_id=mensaje.id, enlace_id=e.id) }}" class="en-linea">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="enlace" type="submit">Revocar</button>
+                </form>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <p class="ayuda enlace-aviso">Cualquiera con el enlace puede leer el mensaje. No lo compartas si es privado.</p>
+    </section>
+
+    <section class="panel">
       <h2>Verificación</h2>
       <p class="ayuda">
         El comprobante incluye el texto firmado, la firma y la clave pública. Cualquiera puede comprobarlo

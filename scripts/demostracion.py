@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from boveda import db as base_datos  # noqa: E402
 from boveda.criptografia import asimetrico, claves  # noqa: E402
-from boveda.servicios import comprobantes, mensajes, usuarios  # noqa: E402
+from boveda.servicios import compartidos, comprobantes, mensajes, usuarios  # noqa: E402
 from boveda.servicios.comun import NoEncontrado  # noqa: E402
-from manipular_mensaje import alterar_con_clave, corromper_cifrado  # noqa: E402
+from manipular_mensaje import alterar_con_clave, corromper_cifrado, trasplantar_cifrado  # noqa: E402
 
 CONTRASENA_ANA = "contraseña-de-ana-2026"
 CONTRASENA_BETO = "contraseña-de-beto-2026"
@@ -89,9 +89,42 @@ def main() -> None:
         comprobante["payload"]["cuerpo"] = "Cancelo la reunión."
         print("Comprobante editado: ", comprobantes.validar(comprobante, clave_publica).mensaje)
 
-        seccion("7. Atacante sin la clave maestra corrompe el cifrado")
-        corromper_cifrado(db, segundo)
-        msg = mensajes.obtener(db, clave_datos, beto, segundo)
+        seccion("7. Enlace público de solo lectura")
+        enlace = compartidos.crear_enlace(db, segundo, beto)
+        publico = compartidos.resolver_enlace(db, clave_datos, enlace.token)
+        print("Enlace: /p/" + enlace.token)
+        print("El enlace lee:", publico.mensaje.cuerpo)
+        print("Estado:", publico.mensaje.estado_firma)
+        print("Compartido por:", publico.creado_por)
+
+        seccion("8. Alguien con la clave maestra altera el mensaje compartido")
+        alterar_con_clave(db, clave_datos, segundo, "Cancelo la reunión.")
+        publico = compartidos.resolver_enlace(db, clave_datos, enlace.token)
+        print("El enlace sigue abriendo, pero muestra:", publico.mensaje.estado_firma)
+        print("Cuerpo:", publico.mensaje.cuerpo)
+        print("Motivo:", publico.mensaje.motivo_firma)
+
+        seccion("9. Revocar el enlace")
+        compartidos.revocar_enlace(db, segundo, enlace.id, beto)
+        try:
+            compartidos.resolver_enlace(db, clave_datos, enlace.token)
+        except NoEncontrado:
+            print("Después de revocarlo, el enlace ya no existe.")
+
+        seccion("10. Mover el cifrado de un mensaje a otro")
+        origen = mensajes.enviar(db, clave_datos, ana, "beto", "Origen", "Texto del origen", CONTRASENA_ANA)
+        destino = mensajes.enviar(db, clave_datos, ana, "beto", "Destino", "Texto del destino", CONTRASENA_ANA)
+        trasplantar_cifrado(db, destino, origen)
+        msg_destino = mensajes.obtener(db, clave_datos, beto, destino)
+        msg_origen = mensajes.obtener(db, clave_datos, beto, origen)
+        print("El destino se puede descifrar:", msg_destino.descifrable)
+        print("Estado del destino:", msg_destino.estado_firma)
+        print("El origen sigue válido:", msg_origen.estado_firma, "-", msg_origen.cuerpo)
+
+        seccion("11. Atacante sin la clave maestra corrompe el cifrado")
+        cuarto = mensajes.enviar(db, clave_datos, ana, "beto", "Otro", "Otro texto", CONTRASENA_ANA)
+        corromper_cifrado(db, cuarto)
+        msg = mensajes.obtener(db, clave_datos, beto, cuarto)
         print("Estado:", msg.estado_firma, "-", msg.motivo_firma)
 
     print(f"\nBase temporal de la demostración: {carpeta}")

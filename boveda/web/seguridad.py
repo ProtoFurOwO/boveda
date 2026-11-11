@@ -52,8 +52,12 @@ def instalar(app: Flask) -> None:
         respuesta.headers["Content-Security-Policy"] = POLITICA_CSP
         respuesta.headers["X-Content-Type-Options"] = "nosniff"
         respuesta.headers["X-Frame-Options"] = "DENY"
-        respuesta.headers["Referrer-Policy"] = "same-origin"
         respuesta.headers["Cache-Control"] = "no-store"
+        if request.path.startswith("/p/"):
+            respuesta.headers["Referrer-Policy"] = "no-referrer"
+            respuesta.headers["X-Robots-Tag"] = "noindex, nofollow"
+        else:
+            respuesta.headers["Referrer-Policy"] = "same-origin"
         return respuesta
 
     @app.errorhandler(HTTPException)

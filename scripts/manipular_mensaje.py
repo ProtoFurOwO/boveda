@@ -5,10 +5,13 @@ Modos:
          AES-GCM no detecta el cambio, pero la firma Ed25519 sí.
   bytes  El atacante no tiene la clave: corrompe un byte del cifrado.
          AES-GCM lo detecta al descifrar.
+  trasplantar  Copia el cuerpo cifrado de otro mensaje a este. El destino ya no
+               se puede descifrar porque los datos asociados (AAD) no coinciden.
 
 Uso:
   python scripts/manipular_mensaje.py <id_mensaje> llave ["nuevo texto"]
   python scripts/manipular_mensaje.py <id_mensaje> bytes
+  python scripts/manipular_mensaje.py <id_destino> trasplantar <id_origen>
 """
 
 import sys
@@ -21,7 +24,7 @@ from boveda.config import Configuracion  # noqa: E402
 from boveda.criptografia import claves, simetrico  # noqa: E402
 from boveda.servicios import mensajes  # noqa: E402
 
-MODOS = ("llave", "bytes")
+MODOS = ("llave", "bytes", "trasplantar")
 
 
 def alterar_con_clave(db, clave_datos: bytes, mensaje_id: str, nuevo_cuerpo: str) -> str:
@@ -41,6 +44,13 @@ def corromper_cifrado(db, mensaje_id: str) -> None:
     prefijo, _, cuerpo = fila["cuerpo_cifrado"].rpartition(":")
     cambiado = ("B" if cuerpo[0] != "B" else "C") + cuerpo[1:]
     db.execute("UPDATE mensajes SET cuerpo_cifrado = ? WHERE id = ?", (f"{prefijo}:{cambiado}", mensaje_id))
+    db.commit()
+
+
+def trasplantar_cifrado(db, destino_id: str, origen_id: str) -> None:
+    destino = _buscar(db, destino_id)
+    origen = _buscar(db, origen_id)
+    db.execute("UPDATE mensajes SET cuerpo_cifrado = ? WHERE id = ?", (origen["cuerpo_cifrado"], destino["id"]))
     db.commit()
 
 
@@ -74,10 +84,17 @@ def main(argv: list[str]) -> int:
             original = alterar_con_clave(db, clave_datos, mensaje_id, nuevo)
             print(f"Contenido original: {original!r}")
             print(f"Contenido ahora:    {nuevo!r}")
-        else:
+        elif modo == "bytes":
             corromper_cifrado(db, mensaje_id)
             print("Se corrompió un byte del cifrado en la base de datos.")
-        print("Recarga la página del mensaje para ver el resultado.")
+        else:
+            if len(argv) < 4:
+                print(__doc__)
+                return 2
+            trasplantar_cifrado(db, mensaje_id, argv[3])
+            print(f"Se copió el cifrado del mensaje {argv[3]} al mensaje {mensaje_id}.")
+            print("El destino ya no se puede descifrar; el mensaje original sigue válido.")
+        print("Recarga la página del mensaje o el enlace compartido para ver el resultado.")
     finally:
         db.close()
     return 0
