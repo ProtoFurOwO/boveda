@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sello %}
+{% block titulo %}Mensajes{% endblock %}
+{% block contenido %}
+<div class="encabezado-pagina">
+  <div>
+    <h1>Mensajes</h1>
+    <p class="muted">Cada mensaje se cifra al guardarse y va firmado por quien lo escribió.</p>
+  </div>
+  <a class="boton boton--primario" href="{{ url_for('mensajes.nuevo') }}">Escribir mensaje</a>
+</div>
+
+<nav class="pestanas" aria-label="Bandejas">
+  <a class="pestana {{ 'pestana--activa' if bandeja == 'recibidos' }}" href="{{ url_for('mensajes.lista', bandeja='recibidos') }}">Recibidos</a>
+  <a class="pestana {{ 'pestana--activa' if bandeja == 'enviados' }}" href="{{ url_for('mensajes.lista', bandeja='enviados') }}">Enviados</a>
+</nav>
+
+{% if mensajes %}
+  <ol class="archivo">
+    {% for m in mensajes %}
+      <li class="archivo__fila">
+        <a class="archivo__titulo" href="{{ url_for('mensajes.detalle', mensaje_id=m.id) }}">{{ m.asunto }}</a>
+        <div class="archivo__estado">
+          {{ sello(m.estado_firma, pequeno=True) }}
+          <time class="muted" datetime="{{ m.creado_en }}">{{ m.creado_en|fecha }}</time>
+        </div>
+        <p class="archivo__extracto">
+          <span class="muted">{{ 'Para' if bandeja == 'enviados' else 'De' }} {{ m.destinatario if bandeja == 'enviados' else m.remitente }}</span>
+          {% if m.descifrable %} · {{ m.cuerpo[:160] }}{% endif %}
+        </p>
+      </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <div class="vacio">
+    <p>No hay mensajes en {{ 'recibidos' if bandeja == 'recibidos' else 'enviados' }}.</p>
+    <a class="boton boton--primario" href="{{ url_for('mensajes.nuevo') }}">Escribir mensaje</a>
+  </div>
+{% endif %}
+{% endblock %}

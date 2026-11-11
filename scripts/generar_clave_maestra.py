@@ -1,4 +1,4 @@
-"""Imprime una clave maestra nueva (256 bits en base64) para la variable BOVEDA_CLAVE_MAESTRA.
+r"""Imprime una clave maestra nueva (256 bits en base64) para la variable BOVEDA_CLAVE_MAESTRA.
 
 PowerShell:
   $env:BOVEDA_CLAVE_MAESTRA = python scripts\generar_clave_maestra.py

@@ -3,6 +3,6 @@
         'valida': ('Firmado', 'sello--ok'),
         'invalida': ('Alterado', 'sello--error'),
       } -%}
-  {%- set etiqueta, clase = datos.get(estado, ('Sin firmar', 'sello--pendiente')) -%}
+  {%- set etiqueta, clase = datos.get(estado, ('Sin firma', 'sello--pendiente')) -%}
   <span class="sello {{ clase }}{% if pequeno %} sello--pequeno{% endif %}{% if grande %} sello--grande{% endif %}{% if animado %} sello--animado{% endif %}">{{ etiqueta }}</span>
 {%- endmacro %}

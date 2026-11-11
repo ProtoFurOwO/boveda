@@ -1,4 +1,4 @@
-"""Páginas públicas: inicio, verificación de certificados y transparencia de seguridad."""
+"""Páginas públicas: inicio, verificación de comprobantes y transparencia de seguridad."""
 
 import json
 
@@ -6,7 +6,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 
 from boveda.criptografia import asimetrico
 from boveda.db import obtener_db
-from boveda.servicios import certificados, usuarios
+from boveda.servicios import comprobantes, usuarios
 from boveda.servicios.comun import ErrorServicio
 
 bp = Blueprint("publico", __name__)
@@ -14,7 +14,7 @@ bp = Blueprint("publico", __name__)
 
 @bp.get("/")
 def inicio():
-    return redirect(url_for("documentos.lista" if g.usuario else "auth.login"))
+    return redirect(url_for("mensajes.lista" if g.usuario else "auth.login"))
 
 
 @bp.route("/verificar", methods=["GET", "POST"])
@@ -30,23 +30,25 @@ def verificar():
 
 @bp.get("/seguridad")
 def seguridad():
-    total = obtener_db().execute("SELECT COUNT(*) FROM documentos").fetchone()[0]
-    return render_template("seguridad.html", total_documentos=total)
+    total = obtener_db().execute("SELECT COUNT(*) FROM mensajes").fetchone()[0]
+    return render_template("seguridad.html", total_mensajes=total)
 
 
-def _verificar_subida() -> certificados.ResultadoVerificacion:
-    archivo = request.files.get("certificado")
+def _verificar_subida() -> comprobantes.ResultadoVerificacion:
+    archivo = request.files.get("comprobante")
     if archivo is None or not archivo.filename:
-        raise ErrorServicio("Selecciona un archivo de certificado (.json)")
+        raise ErrorServicio("Selecciona un archivo de comprobante (.json)")
     try:
         datos = json.loads(archivo.read().decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise ErrorServicio("El archivo no es un JSON válido") from e
     if not isinstance(datos, dict) or not isinstance(datos.get("payload"), dict):
-        raise ErrorServicio("El archivo no es un certificado de Bóveda")
-    autor = datos["payload"].get("autor")
-    registrado = usuarios.buscar_por_nombre(obtener_db(), autor) if isinstance(autor, str) else None
+        raise ErrorServicio("El archivo no es un comprobante de Bóveda")
+    remitente = datos["payload"].get("remitente")
+    registrado = usuarios.buscar_por_nombre(obtener_db(), remitente) if isinstance(remitente, str) else None
     if registrado is None:
-        raise ErrorServicio("El autor del certificado no está registrado en esta bóveda: no es posible confirmar su clave pública")
+        raise ErrorServicio(
+            "El remitente del comprobante no está registrado en esta bóveda: no es posible confirmar su clave pública"
+        )
     clave = asimetrico.cargar_publica(registrado["clave_publica_pem"])
-    return certificados.validar(datos, clave)
+    return comprobantes.validar(datos, clave)

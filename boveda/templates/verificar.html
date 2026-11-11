@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block titulo %}Verificar certificado{% endblock %}
+{% block titulo %}Verificar comprobante{% endblock %}
 {% block contenido %}
 <div class="verificar">
   <section class="hoja hoja--form">
-    <h1>Verificar un certificado</h1>
+    <h1>Verificar un comprobante</h1>
     <p class="ayuda">
-      Sube el archivo .json que descargaste de un documento firmado. Bóveda compara su firma con la clave pública
-      registrada del autor. No necesitas tener cuenta.
+      Sube el archivo .json que descargaste de un mensaje. Bóveda compara su firma con la clave pública
+      registrada del remitente. No necesitas tener cuenta.
     </p>
     <form method="post" enctype="multipart/form-data" class="formulario">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="campo">
-        <span>Archivo de certificado</span>
-        <input class="input" type="file" name="certificado" accept=".json,application/json" required>
+        <span>Archivo de comprobante</span>
+        <input class="input" type="file" name="comprobante" accept=".json,application/json" required>
       </label>
-      <button class="boton boton--primario" type="submit">Verificar certificado</button>
+      <button class="boton boton--primario" type="submit">Verificar comprobante</button>
     </form>
   </section>
 
@@ -22,23 +22,25 @@
     <section class="resultado" aria-live="polite">
       {% if resultado.valido %}
         <span class="sello sello--ok sello--grande sello--animado">Auténtico</span>
-        <h2>El documento no cambió después de firmarse</h2>
+        <h2>El mensaje no cambió después de firmarse</h2>
       {% else %}
         <span class="sello sello--error sello--grande sello--animado">No verificado</span>
-        <h2>No se pudo confirmar este certificado</h2>
+        <h2>No se pudo confirmar este comprobante</h2>
         <p>{{ resultado.mensaje }}</p>
       {% endif %}
       <dl class="datos">
-        <dt>Documento</dt>
-        <dd>{{ resultado.payload.titulo }}</dd>
-        <dt>Autor</dt>
-        <dd>{{ resultado.payload.autor }}</dd>
+        <dt>Asunto</dt>
+        <dd>{{ resultado.payload.asunto }}</dd>
+        <dt>De</dt>
+        <dd>{{ resultado.payload.remitente }}</dd>
+        <dt>Para</dt>
+        <dd>{{ resultado.payload.destinatario }}</dd>
         <dt>Firmado</dt>
         <dd>{{ resultado.payload.firmado_en|fecha }}</dd>
       </dl>
       <details class="tecnico">
-        <summary>Contenido que figura en el certificado</summary>
-        <div class="doc__texto doc__texto--pequeno">{{ resultado.payload.contenido }}</div>
+        <summary>Contenido que figura en el comprobante</summary>
+        <div class="mensaje__texto mensaje__texto--pequeno">{{ resultado.payload.cuerpo }}</div>
       </details>
     </section>
   {% endif %}

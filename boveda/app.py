@@ -17,7 +17,7 @@ def crear_app(config: Configuracion | None = None) -> Flask:
     app = Flask(__name__)
     app.config.update(
         SECRET_KEY=derivar_subclave(clave.valor, "sesion-web"),
-        CLAVE_DATOS=derivar_subclave(clave.valor, "datos-documentos"),
+        CLAVE_DATOS=derivar_subclave(clave.valor, "datos-mensajes"),
         CLAVE_ORIGEN=clave.origen,
         CLAVE_HUELLA=clave.huella,
         RUTA_BD=str(cfg.ruta_bd),

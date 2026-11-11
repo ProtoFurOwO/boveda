@@ -4,7 +4,7 @@ import json
 import pytest
 
 from boveda.criptografia import asimetrico, simetrico
-from boveda.servicios import certificados, documentos, usuarios
+from boveda.servicios import comprobantes, mensajes, usuarios
 from boveda.servicios.comun import ContrasenaIncorrecta, ErrorServicio, NoEncontrado
 
 CONTRASENA = "contraseña-segura-1"
@@ -12,11 +12,20 @@ CONTRASENA = "contraseña-segura-1"
 
 @pytest.fixture
 def ana(db):
-    return usuarios.registrar(db, "Ana", CONTRASENA)
+    return usuarios.registrar(db, "ana", CONTRASENA)
 
 
-def _crear(db, clave, usuario_id, titulo="Contrato", contenido="Pagar 100 pesos"):
-    return documentos.crear(db, clave, usuario_id, titulo, contenido)
+@pytest.fixture
+def beto(db):
+    return usuarios.registrar(db, "beto", CONTRASENA)
+
+
+def _enviar(db, clave, remitente, destinatario="beto", asunto="Clave", cuerpo="La clave es 4321", contrasena=CONTRASENA):
+    return mensajes.enviar(db, clave, remitente, destinatario, asunto, cuerpo, contrasena)
+
+
+def _fila(db, mensaje_id):
+    return db.execute("SELECT * FROM mensajes WHERE id = ?", (mensaje_id,)).fetchone()
 
 
 def test_registro_guarda_solo_hash_y_llave_privada_cifrada(db):
@@ -39,128 +48,135 @@ def test_autenticacion_rechaza_contrasenas_incorrectas(db, ana):
     assert usuarios.autenticar(db, "nadie", CONTRASENA) is None
 
 
-def test_documento_se_guarda_cifrado_y_se_lee_en_claro(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana, "Clave del banco", "NIP 4321")
-    bruto = db.execute("SELECT * FROM documentos WHERE id = ?", (doc_id,)).fetchone()
-    assert "banco" not in bruto["titulo_cifrado"]
-    assert "4321" not in bruto["contenido_cifrado"]
-    doc = documentos.obtener(db, clave_datos, ana, doc_id)
-    assert (doc.titulo, doc.contenido) == ("Clave del banco", "NIP 4321")
-    assert doc.estado_firma == documentos.SIN_FIRMA
+def test_el_mensaje_se_guarda_cifrado_y_se_lee_en_claro(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana, asunto="Clave de la sala", cuerpo="La clave es 4321")
+    bruto = _fila(db, mensaje_id)
+    assert "sala" not in bruto["asunto_cifrado"]
+    assert "4321" not in bruto["cuerpo_cifrado"]
+    assert bruto["cuerpo_cifrado"].startswith("v1:")
+
+    msg = mensajes.obtener(db, clave_datos, beto, mensaje_id)
+    assert (msg.asunto, msg.cuerpo) == ("Clave de la sala", "La clave es 4321")
+    assert (msg.remitente, msg.destinatario) == ("ana", "beto")
+    assert msg.estado_firma == mensajes.VALIDA
+    assert mensajes.obtener(db, clave_datos, ana, mensaje_id).cuerpo == "La clave es 4321"
 
 
-def test_firmar_exige_la_contrasena_correcta(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
+def test_firmar_exige_la_contrasena_correcta_y_no_guarda_nada(db, clave_datos, ana, beto):
     with pytest.raises(ContrasenaIncorrecta):
-        documentos.firmar(db, clave_datos, ana, doc_id, "otra-contrasena-123")
-    assert documentos.obtener(db, clave_datos, ana, doc_id).estado_firma == documentos.SIN_FIRMA
+        _enviar(db, clave_datos, ana, contrasena="otra-contrasena-123")
+    assert db.execute("SELECT COUNT(*) FROM mensajes").fetchone()[0] == 0
 
 
-def test_firma_valida_y_se_detecta_alteracion_con_la_clave_maestra(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
-    documentos.firmar(db, clave_datos, ana, doc_id, CONTRASENA)
-    assert documentos.obtener(db, clave_datos, ana, doc_id).estado_firma == documentos.VALIDA
+def test_un_tercero_no_puede_abrir_ni_eliminar_el_mensaje(db, clave_datos, ana, beto):
+    carla = usuarios.registrar(db, "carla", CONTRASENA)
+    mensaje_id = _enviar(db, clave_datos, ana)
+    with pytest.raises(NoEncontrado):
+        mensajes.obtener(db, clave_datos, carla, mensaje_id)
+    with pytest.raises(NoEncontrado):
+        mensajes.eliminar(db, carla, mensaje_id)
+    assert mensajes.obtener(db, clave_datos, beto, mensaje_id) is not None
 
-    # Un atacante con la clave maestra re-cifra otro texto: AES-GCM lo acepta, la firma no.
-    contexto = documentos.contexto_documento(ana, doc_id, "contenido")
+
+def test_firma_detecta_alteracion_con_la_clave_maestra(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana)
+    fila = _fila(db, mensaje_id)
+    contexto = mensajes.contexto_mensaje(fila["remitente_id"], fila["destinatario_id"], mensaje_id, "cuerpo")
     db.execute(
-        "UPDATE documentos SET contenido_cifrado = ? WHERE id = ?",
-        (simetrico.cifrar_texto("Pagar 900 pesos", clave_datos, contexto), doc_id),
+        "UPDATE mensajes SET cuerpo_cifrado = ? WHERE id = ?",
+        (simetrico.cifrar_texto("La clave es 0000", clave_datos, contexto), mensaje_id),
     )
     db.commit()
-    doc = documentos.obtener(db, clave_datos, ana, doc_id)
-    assert doc.descifrable
-    assert doc.contenido == "Pagar 900 pesos"
-    assert doc.estado_firma == documentos.INVALIDA
+
+    msg = mensajes.obtener(db, clave_datos, beto, mensaje_id)
+    assert msg.descifrable
+    assert msg.cuerpo == "La clave es 0000"
+    assert msg.estado_firma == mensajes.INVALIDA
 
 
-def test_alterar_bytes_del_cifrado_se_detecta_con_aes_gcm(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
-    cifrado = db.execute("SELECT contenido_cifrado FROM documentos WHERE id = ?", (doc_id,)).fetchone()[0]
+def test_si_solo_se_altera_el_cuerpo_el_asunto_sigue_legible(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana, asunto="Asunto intacto")
+    cifrado = _fila(db, mensaje_id)["cuerpo_cifrado"]
     prefijo, _, cuerpo = cifrado.rpartition(":")
     cambiado = ("B" if cuerpo[0] != "B" else "C") + cuerpo[1:]
-    db.execute("UPDATE documentos SET contenido_cifrado = ? WHERE id = ?", (f"{prefijo}:{cambiado}", doc_id))
+    db.execute("UPDATE mensajes SET cuerpo_cifrado = ? WHERE id = ?", (f"{prefijo}:{cambiado}", mensaje_id))
     db.commit()
-    doc = documentos.obtener(db, clave_datos, ana, doc_id)
-    assert not doc.descifrable
-    assert doc.estado_firma == documentos.INVALIDA
+
+    msg = mensajes.obtener(db, clave_datos, beto, mensaje_id)
+    assert msg.asunto == "Asunto intacto"
+    assert not msg.descifrable
+    assert msg.estado_firma == mensajes.INVALIDA
 
 
-def test_si_solo_se_altera_el_contenido_el_titulo_sigue_legible(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana, "Título intacto", "texto alterado")
-    cifrado = db.execute("SELECT contenido_cifrado FROM documentos WHERE id = ?", (doc_id,)).fetchone()[0]
-    prefijo, _, cuerpo = cifrado.rpartition(":")
-    cambiado = ("B" if cuerpo[0] != "B" else "C") + cuerpo[1:]
-    db.execute("UPDATE documentos SET contenido_cifrado = ? WHERE id = ?", (f"{prefijo}:{cambiado}", doc_id))
+def test_un_cifrado_no_se_puede_trasplantar_a_otro_mensaje(db, clave_datos, ana, beto):
+    primero = _enviar(db, clave_datos, ana, asunto="Primero", cuerpo="texto del primero")
+    segundo = _enviar(db, clave_datos, ana, asunto="Segundo", cuerpo="texto del segundo")
+    cifrado_primero = _fila(db, primero)["cuerpo_cifrado"]
+    db.execute("UPDATE mensajes SET cuerpo_cifrado = ? WHERE id = ?", (cifrado_primero, segundo))
     db.commit()
-    doc = documentos.obtener(db, clave_datos, ana, doc_id)
-    assert doc.titulo == "Título intacto"
-    assert not doc.descifrable
-    assert doc.estado_firma == documentos.INVALIDA
+    assert not mensajes.obtener(db, clave_datos, beto, segundo).descifrable
 
 
-def test_editar_invalida_la_firma_solo_si_hubo_cambios(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
-    documentos.firmar(db, clave_datos, ana, doc_id, CONTRASENA)
-    assert documentos.actualizar(db, clave_datos, ana, doc_id, "Contrato", "Pagar 100 pesos") is False
-    assert documentos.obtener(db, clave_datos, ana, doc_id).estado_firma == documentos.VALIDA
-    assert documentos.actualizar(db, clave_datos, ana, doc_id, "Contrato", "Pagar 900 pesos") is True
-    assert documentos.obtener(db, clave_datos, ana, doc_id).estado_firma == documentos.SIN_FIRMA
-
-
-def test_los_documentos_de_otro_usuario_no_son_accesibles(db, clave_datos, ana):
-    beto = usuarios.registrar(db, "beto", CONTRASENA)
-    doc_id = _crear(db, clave_datos, ana)
+def test_eliminar_borra_el_mensaje_para_ambos(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana)
+    mensajes.eliminar(db, beto, mensaje_id)
     with pytest.raises(NoEncontrado):
-        documentos.obtener(db, clave_datos, beto, doc_id)
+        mensajes.obtener(db, clave_datos, ana, mensaje_id)
     with pytest.raises(NoEncontrado):
-        documentos.eliminar(db, beto, doc_id)
+        mensajes.obtener(db, clave_datos, beto, mensaje_id)
 
 
-def test_un_cifrado_no_se_puede_trasplantar_a_otro_documento(db, clave_datos, ana):
-    origen = _crear(db, clave_datos, ana, "Origen", "texto del origen")
-    destino = _crear(db, clave_datos, ana, "Destino", "texto del destino")
-    cifrado_origen = db.execute("SELECT contenido_cifrado FROM documentos WHERE id = ?", (origen,)).fetchone()[0]
-    db.execute("UPDATE documentos SET contenido_cifrado = ? WHERE id = ?", (cifrado_origen, destino))
-    db.commit()
-    assert not documentos.obtener(db, clave_datos, ana, destino).descifrable
+def test_no_se_puede_enviar_a_si_mismo_ni_a_un_usuario_inexistente(db, clave_datos, ana):
+    with pytest.raises(ErrorServicio, match="a ti mismo"):
+        _enviar(db, clave_datos, ana, destinatario="ana")
+    with pytest.raises(ErrorServicio, match="no existe"):
+        _enviar(db, clave_datos, ana, destinatario="nadie")
+    with pytest.raises(ErrorServicio, match="contraseña"):
+        _enviar(db, clave_datos, ana, destinatario="beto", contrasena="")
 
 
-def test_certificado_se_verifica_sin_la_aplicacion(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
-    documentos.firmar(db, clave_datos, ana, doc_id, CONTRASENA)
-    cert = documentos.certificado(db, clave_datos, ana, doc_id)
-    clave = asimetrico.cargar_publica(cert["clave_publica_pem"])
-    assert certificados.validar(cert, clave).valido
+def test_comprobante_se_verifica_sin_la_aplicacion(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana, asunto="Confirmación", cuerpo="Confirmo la reunión")
+    comprobante = mensajes.comprobante(db, clave_datos, beto, mensaje_id)
+    clave = asimetrico.cargar_publica(comprobante["clave_publica_pem"])
+    assert comprobantes.validar(comprobante, clave).valido
 
-    alterado = json.loads(json.dumps(cert))
-    alterado["payload"]["contenido"] = "Pagar 900 pesos"
-    resultado = certificados.validar(alterado, clave)
+    alterado = json.loads(json.dumps(comprobante))
+    alterado["payload"]["cuerpo"] = "Cancelo la reunión"
+    resultado = comprobantes.validar(alterado, clave)
     assert not resultado.valido
     assert "alterado" in resultado.mensaje
 
 
-def test_certificado_con_clave_ajena_se_rechaza_como_falsificacion(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
-    documentos.firmar(db, clave_datos, ana, doc_id, CONTRASENA)
-    cert = documentos.certificado(db, clave_datos, ana, doc_id)
-    clave_registrada = asimetrico.cargar_publica(cert["clave_publica_pem"])
+def test_comprobante_con_clave_ajena_se_rechaza_como_falsificacion(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana)
+    comprobante = mensajes.comprobante(db, clave_datos, beto, mensaje_id)
+    clave_registrada = asimetrico.cargar_publica(comprobante["clave_publica_pem"])
+
     impostor = asimetrico.generar_par()
-    cert_falso = json.loads(json.dumps(cert))
-    cert_falso["clave_publica_pem"] = asimetrico.pem_publica(impostor.public_key())
-    firma = asimetrico.firmar(impostor, certificados.mensaje_firmado(cert_falso["payload"]))
-    cert_falso["firma"] = base64.b64encode(firma).decode("ascii")
-    resultado = certificados.validar(cert_falso, clave_registrada)
+    falso = json.loads(json.dumps(comprobante))
+    falso["clave_publica_pem"] = asimetrico.pem_publica(impostor.public_key())
+    firma = asimetrico.firmar(impostor, comprobantes.mensaje_firmado(falso["payload"]))
+    falso["firma"] = base64.b64encode(firma).decode("ascii")
+
+    resultado = comprobantes.validar(falso, clave_registrada)
     assert not resultado.valido
     assert "falsificación" in resultado.mensaje
 
 
-def test_no_se_emite_certificado_de_un_documento_sin_firma(db, clave_datos, ana):
-    doc_id = _crear(db, clave_datos, ana)
-    with pytest.raises(ErrorServicio, match="Firma el documento"):
-        documentos.certificado(db, clave_datos, ana, doc_id)
+def test_no_se_emite_comprobante_si_la_firma_ya_no_es_valida(db, clave_datos, ana, beto):
+    mensaje_id = _enviar(db, clave_datos, ana)
+    fila = _fila(db, mensaje_id)
+    contexto = mensajes.contexto_mensaje(fila["remitente_id"], fila["destinatario_id"], mensaje_id, "cuerpo")
+    db.execute(
+        "UPDATE mensajes SET cuerpo_cifrado = ? WHERE id = ?",
+        (simetrico.cifrar_texto("texto cambiado", clave_datos, contexto), mensaje_id),
+    )
+    db.commit()
+    with pytest.raises(ErrorServicio, match="ya no es válida"):
+        mensajes.comprobante(db, clave_datos, beto, mensaje_id)
 
 
-def test_certificado_con_formato_invalido_se_rechaza(db):
-    with pytest.raises(certificados.FormatoInvalido):
-        certificados.validar({"formato": "otra-cosa"}, asimetrico.generar_par().public_key())
+def test_comprobante_con_formato_invalido_se_rechaza(db):
+    with pytest.raises(comprobantes.FormatoInvalido):
+        comprobantes.validar({"formato": "otra-cosa"}, asimetrico.generar_par().public_key())

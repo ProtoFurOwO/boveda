@@ -258,10 +258,28 @@ h2 { font-family: var(--sans); font-size: 1.05rem; font-weight: 600; }
 }
 .vacio .boton { margin-top: 8px; }
 
+/* Pestañas de bandeja */
+.pestanas {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--linea-fuerte);
+}
+.pestana {
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  color: var(--tinta-suave);
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  font-weight: 500;
+}
+.pestana:hover { color: var(--tinta); }
+.pestana--activa { color: var(--petroleo); border-bottom-color: var(--petroleo); }
+
 /* Documento */
 .detalle { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
-.hoja--documento { min-height: 420px; }
-.doc__cabecera {
+.hoja--mensaje { min-height: 420px; }
+.mensaje__cabecera {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -271,9 +289,9 @@ h2 { font-family: var(--sans); font-size: 1.05rem; font-weight: 600; }
   margin-bottom: 28px;
   border-bottom: 1px solid var(--linea);
 }
-.doc__cabecera h1 { margin-bottom: 8px; }
-.doc__meta { margin: 0; color: var(--tinta-suave); font-size: 0.92rem; }
-.doc__texto {
+.mensaje__cabecera h1 { margin-bottom: 8px; }
+.mensaje__meta { margin: 0; color: var(--tinta-suave); font-size: 0.92rem; }
+.mensaje__texto {
   font-family: var(--serif);
   font-size: 1.12rem;
   line-height: 1.8;
@@ -281,8 +299,8 @@ h2 { font-family: var(--sans); font-size: 1.05rem; font-weight: 600; }
   overflow-wrap: anywhere;
   max-width: 66ch;
 }
-.doc__texto--pequeno { font-size: 1rem; max-width: none; }
-.doc__acciones {
+.mensaje__texto--pequeno { font-size: 1rem; max-width: none; }
+.mensaje__acciones {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

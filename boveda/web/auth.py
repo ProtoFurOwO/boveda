@@ -25,7 +25,7 @@ def requiere_sesion(vista):
 @bp.route("/registro", methods=["GET", "POST"])
 def registro():
     if g.usuario is not None:
-        return redirect(url_for("documentos.lista"))
+        return redirect(url_for("mensajes.lista"))
     if request.method == "POST":
         nombre = request.form.get("nombre", "")
         contrasena = request.form.get("contrasena", "")
@@ -38,14 +38,14 @@ def registro():
             return render_template("registro.html", nombre=nombre), 400
         _iniciar_sesion(usuario_id)
         flash("Cuenta creada. Tu llave de firma Ed25519 se generó y se guarda cifrada con tu contraseña.", "ok")
-        return redirect(url_for("documentos.lista"))
+        return redirect(url_for("mensajes.lista"))
     return render_template("registro.html", nombre="")
 
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if g.usuario is not None:
-        return redirect(url_for("documentos.lista"))
+        return redirect(url_for("mensajes.lista"))
     if request.method == "POST":
         nombre = request.form.get("nombre", "")
         fila = usuarios.autenticar(obtener_db(), nombre, request.form.get("contrasena", ""))
@@ -53,7 +53,7 @@ def login():
             flash("Usuario o contraseña incorrectos", "error")
             return render_template("login.html", nombre=nombre), 401
         _iniciar_sesion(fila["id"])
-        return redirect(url_for("documentos.lista"))
+        return redirect(url_for("mensajes.lista"))
     return render_template("login.html", nombre="")
 
 

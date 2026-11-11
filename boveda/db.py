@@ -1,7 +1,7 @@
 """Conexión y esquema de SQLite.
 
 Todo lo cifrado se guarda como texto ("v1:<nonce>:<cifrado>"), así que la base de datos
-nunca contiene títulos, contenidos ni llaves privadas en claro.
+nunca contiene asuntos, mensajes ni llaves privadas en claro.
 """
 
 import contextlib
@@ -21,18 +21,19 @@ CREATE TABLE IF NOT EXISTS usuarios (
     creado_en             TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS documentos (
-    id                TEXT PRIMARY KEY,
-    usuario_id        TEXT NOT NULL REFERENCES usuarios(id),
-    titulo_cifrado    TEXT NOT NULL,
-    contenido_cifrado TEXT NOT NULL,
-    creado_en         TEXT NOT NULL,
-    actualizado_en    TEXT NOT NULL,
-    firma             TEXT,
-    firmado_en        TEXT
+CREATE TABLE IF NOT EXISTS mensajes (
+    id               TEXT PRIMARY KEY,
+    remitente_id     TEXT NOT NULL REFERENCES usuarios(id),
+    destinatario_id  TEXT NOT NULL REFERENCES usuarios(id),
+    asunto_cifrado   TEXT NOT NULL,
+    cuerpo_cifrado   TEXT NOT NULL,
+    creado_en        TEXT NOT NULL,
+    firma            TEXT,
+    firmado_en       TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_documentos_usuario ON documentos(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_mensajes_destinatario ON mensajes(destinatario_id);
+CREATE INDEX IF NOT EXISTS idx_mensajes_remitente ON mensajes(remitente_id);
 """
 
 

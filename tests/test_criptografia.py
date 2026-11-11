@@ -125,7 +125,7 @@ def test_clave_maestra_invalida_se_rechaza_sin_revelarla(tmp_path):
 
 def test_subclaves_son_deterministas_y_separadas_por_proposito():
     maestra = _clave()
-    datos = claves.derivar_subclave(maestra, "datos-documentos")
-    assert datos == claves.derivar_subclave(maestra, "datos-documentos")
+    datos = claves.derivar_subclave(maestra, "datos-mensajes")
+    assert datos == claves.derivar_subclave(maestra, "datos-mensajes")
     assert datos != claves.derivar_subclave(maestra, "sesion-web")
     assert datos != maestra

@@ -17,7 +17,7 @@ def scrypt_rapido(monkeypatch):
 
 @pytest.fixture
 def clave_datos():
-    return claves.derivar_subclave(secrets.token_bytes(32), "datos-documentos")
+    return claves.derivar_subclave(secrets.token_bytes(32), "datos-mensajes")
 
 
 @pytest.fixture

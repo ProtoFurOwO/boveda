@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sello %}
+{% block titulo %}{{ mensaje.asunto }}{% endblock %}
+{% block contenido %}
+<div class="detalle">
+  <article class="hoja hoja--mensaje">
+    <header class="mensaje__cabecera">
+      <div>
+        <h1>{{ mensaje.asunto }}</h1>
+        <p class="mensaje__meta">
+          De {{ mensaje.remitente }} para {{ mensaje.destinatario }}. Enviado el {{ mensaje.creado_en|fecha }}.
+        </p>
+      </div>
+      {{ sello(mensaje.estado_firma, grande=True, animado=(mensaje.estado_firma == 'valida')) }}
+    </header>
+
+    {% if mensaje.descifrable %}
+      <div class="mensaje__texto">{{ mensaje.cuerpo }}</div>
+    {% else %}
+      <p class="aviso aviso--error">{{ mensaje.motivo_firma }}</p>
+    {% endif %}
+
+    <footer class="mensaje__acciones">
+      <a class="boton boton--secundario" href="{{ url_for('mensajes.nuevo', para=responder_a) }}">Responder</a>
+      <form method="post" action="{{ url_for('mensajes.eliminar', mensaje_id=mensaje.id) }}" class="en-linea" data-confirmar="Se eliminará el mensaje para el remitente y el destinatario. ¿Quieres continuar?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="boton boton--peligro" type="submit">Eliminar</button>
+      </form>
+    </footer>
+  </article>
+
+  <aside class="lateral" aria-labelledby="titulo-firma">
+    <section class="panel">
+      <h2 id="titulo-firma">Firma del remitente</h2>
+      {% if mensaje.descifrable %}
+        <p class="estado-firma">{{ mensaje.motivo_firma }}</p>
+      {% endif %}
+      {% if mensaje.firmado_en %}
+        <dl class="datos">
+          <dt>Firmado</dt>
+          <dd>{{ mensaje.firmado_en|fecha }}</dd>
+          <dt>Remitente</dt>
+          <dd>{{ mensaje.remitente }}</dd>
+          <dt>Algoritmo</dt>
+          <dd>Ed25519</dd>
+          <dt>Huella de la clave</dt>
+          <dd class="mono">{{ mensaje.huella|huella }}</dd>
+        </dl>
+      {% endif %}
+      {% if mensaje.estado_firma == 'valida' %}
+        <a class="boton boton--secundario boton--ancho" href="{{ url_for('mensajes.comprobante', mensaje_id=mensaje.id) }}">Descargar comprobante (.json)</a>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Verificación</h2>
+      <p class="ayuda">
+        El comprobante incluye el texto firmado, la firma y la clave pública. Cualquiera puede comprobarlo
+        en <a href="{{ url_for('publico.verificar') }}">Verificar comprobante</a>, sin cuenta.
+      </p>
+    </section>
+  </aside>
+</div>
+
+<details class="tecnico">
+  <summary>Lo que se guarda en la base de datos</summary>
+  <ol class="ciclo">
+    <li>Escribes el asunto y el mensaje en claro.</li>
+    <li>AES-256-GCM los cifra con una clave derivada de la clave maestra.</li>
+    <li>La base de datos guarda solo el cifrado. El texto nunca se escribe en disco.</li>
+    <li>Al abrirlo se descifra y se comprueba la firma del remitente.</li>
+  </ol>
+  <dl class="tecnico__datos">
+    <dt>Asunto cifrado</dt>
+    <dd><code class="cifrado">{{ mensaje.asunto_cifrado }}</code></dd>
+    <dt>Mensaje cifrado</dt>
+    <dd><code class="cifrado">{{ mensaje.cuerpo_cifrado }}</code></dd>
+    <dt>Firma Ed25519 (base64)</dt>
+    <dd><code class="cifrado">{{ mensaje.firma or "Sin firma" }}</code></dd>
+    <dt>Clave pública del remitente</dt>
+    <dd><pre class="cifrado">{{ mensaje.clave_publica_pem }}</pre></dd>
+  </dl>
+</details>
+{% endblock %}

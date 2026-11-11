@@ -1,1 +1,1 @@
-"""Bóveda: documentos con cifrado simétrico (AES-256-GCM) y firma digital asimétrica (Ed25519)."""
+"""Bóveda: mensajes cifrados (AES-256-GCM) y firmados (Ed25519) entre usuarios."""

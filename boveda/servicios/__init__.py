@@ -1,1 +1,1 @@
-"""Lógica de negocio: usuarios, documentos y certificados. No depende de Flask."""
+"""Lógica de negocio: usuarios, mensajes y comprobantes. No depende de Flask."""

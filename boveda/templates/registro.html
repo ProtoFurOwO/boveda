@@ -6,7 +6,7 @@
     <h1 class="acceso__titular">Tu contraseña también protege tu llave de firma.</h1>
     <p class="acceso__detalle">
       Al crear la cuenta se genera un par de llaves Ed25519. La llave privada se guarda cifrada con una clave
-      derivada de tu contraseña. Sin ella no se puede firmar, y el servidor tampoco puede abrirla.
+      derivada de tu contraseña. Con ella firmas los mensajes que envías, y el servidor no puede abrirla.
     </p>
   </div>
   <form method="post" class="hoja formulario">
@@ -20,7 +20,7 @@
     <label class="campo">
       <span>Contraseña</span>
       <input class="input" type="password" name="contrasena" autocomplete="new-password" required minlength="10" maxlength="128">
-      <small class="ayuda">Mínimo 10 caracteres. Si la olvidas, no podrás firmar documentos.</small>
+      <small class="ayuda">Mínimo 10 caracteres. Si la olvidas, no podrás firmar mensajes.</small>
     </label>
     <label class="campo">
       <span>Repite la contraseña</span>

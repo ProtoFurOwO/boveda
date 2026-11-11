@@ -13,6 +13,7 @@ secretos/*
 *.key
 .env
 certificado-*.json
+comprobante-*.json
 
 # Editores y sistema operativo
 .vscode/

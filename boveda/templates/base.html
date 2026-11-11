@@ -22,9 +22,9 @@
       </a>
       <nav class="navegacion" aria-label="Principal">
         {% if usuario %}
-          <a href="{{ url_for('documentos.lista') }}">Documentos</a>
+          <a href="{{ url_for('mensajes.lista') }}">Mensajes</a>
         {% endif %}
-        <a href="{{ url_for('publico.verificar') }}">Verificar certificado</a>
+        <a href="{{ url_for('publico.verificar') }}">Verificar comprobante</a>
         <a href="{{ url_for('publico.seguridad') }}">Seguridad</a>
         {% if usuario %}
           <form method="post" action="{{ url_for('auth.salir') }}" class="en-linea">
@@ -53,7 +53,7 @@
 
   <footer class="pie">
     <div class="pie__interior">
-      Hecho para la práctica de seguridad en cómputo. Cifrado con AES-256-GCM, firmas con Ed25519 y contraseñas con scrypt.
+      Hecho para la práctica de seguridad en cómputo. Mensajes cifrados con AES-256-GCM, firmados con Ed25519 y contraseñas con scrypt.
     </div>
   </footer>
 </body>

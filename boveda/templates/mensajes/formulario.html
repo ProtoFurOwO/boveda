@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo mensaje{% endblock %}
+{% block contenido %}
+<section class="hoja hoja--form">
+  <h1>Nuevo mensaje</h1>
+  <p class="ayuda">
+    El asunto y el texto se cifran con AES-256-GCM antes de guardarse. Al enviarlo, firmas con tu llave
+    privada Ed25519; por eso te pedimos la contraseña.
+  </p>
+  {% if destinatarios %}
+    <form method="post" class="formulario">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="usuario" value="{{ usuario['nombre'] }}" autocomplete="username" hidden>
+      <label class="campo">
+        <span>Para</span>
+        <select class="input" name="destinatario" autocomplete="off" required>
+          <option value="" disabled {{ 'selected' if not valores.destinatario }}>Elige un destinatario</option>
+          {% for u in destinatarios %}
+            <option value="{{ u['nombre'] }}" {{ 'selected' if valores.destinatario == u['nombre'] }}>{{ u['nombre'] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="campo">
+        <span>Asunto</span>
+        <input class="input" name="asunto" value="{{ valores.asunto }}" maxlength="120" autocomplete="off" required autofocus>
+      </label>
+      <label class="campo">
+        <span>Mensaje</span>
+        <textarea class="area" name="cuerpo" rows="12" maxlength="20000">{{ valores.cuerpo }}</textarea>
+      </label>
+      <label class="campo">
+        <span>Tu contraseña, para firmar</span>
+        <input class="input" type="password" name="contrasena" autocomplete="current-password" required maxlength="128">
+        <small class="ayuda">Solo se usa para desbloquear tu llave privada en este envío.</small>
+      </label>
+      <div class="acciones">
+        <button class="boton boton--primario" type="submit">Firmar y enviar</button>
+        <a class="boton boton--texto" href="{{ url_for('mensajes.lista') }}">Cancelar</a>
+      </div>
+    </form>
+  {% else %}
+    <div class="aviso aviso--info">
+      Para enviar un mensaje necesitas otra cuenta registrada. Crea una segunda cuenta y vuelve a iniciar sesión con esta.
+    </div>
+    <a class="boton boton--texto" href="{{ url_for('mensajes.lista') }}">Volver a la bandeja</a>
+  {% endif %}
+</section>
+{% endblock %}

@@ -2,7 +2,7 @@
 {% block titulo %}Seguridad{% endblock %}
 {% block contenido %}
 <article class="hoja hoja--ancha">
-  <h1>Cómo protege Bóveda tus datos</h1>
+  <h1>Cómo protege Bóveda tus mensajes</h1>
   <p class="entrada">
     Cada mecanismo usa un algoritmo estándar de la librería <code>cryptography</code> de Python.
     Ningún algoritmo está implementado a mano.
@@ -17,12 +17,12 @@
       <tr>
         <td>Cifrado simétrico</td>
         <td>AES-256-GCM con nonce aleatorio de 96 bits</td>
-        <td>Título y texto de cada documento. Se guardan cifrados en la base de datos.</td>
+        <td>Asunto y cuerpo de cada mensaje. Se guardan cifrados en la base de datos.</td>
       </tr>
       <tr>
         <td>Firma asimétrica</td>
         <td>Ed25519 (RFC 8032)</td>
-        <td>Sello de cada documento y certificados que cualquiera puede verificar.</td>
+        <td>Firma de cada mensaje al enviarlo y comprobantes que cualquiera puede verificar.</td>
       </tr>
       <tr>
         <td>Derivación de claves</td>
@@ -56,12 +56,12 @@
       <tr>
         <td>Llave privada de firma, por usuario</td>
         <td>Columna <code>clave_privada_cifrada</code> de la base de datos</td>
-        <td>AES-256-GCM con una clave derivada de tu contraseña. Solo se abre al firmar.</td>
+        <td>AES-256-GCM con una clave derivada de tu contraseña. Solo se abre al enviar un mensaje.</td>
       </tr>
       <tr>
         <td>Llave pública de firma, por usuario</td>
         <td>Columna <code>clave_publica_pem</code></td>
-        <td>No es secreta. Quien la verifica compara su huella SHA-256.</td>
+        <td>No es secreta. Quien verifica un comprobante compara su huella SHA-256.</td>
       </tr>
     </tbody>
   </table>
@@ -74,15 +74,17 @@
     <dd class="mono">{{ config.CLAVE_HUELLA|huella }}</dd>
     <dt>Base de datos</dt>
     <dd class="mono">{{ config.RUTA_BD_VISIBLE }}</dd>
-    <dt>Documentos cifrados</dt>
-    <dd>{{ total_documentos }}</dd>
+    <dt>Mensajes cifrados</dt>
+    <dd>{{ total_mensajes }}</dd>
   </dl>
-  <p class="ayuda">La huella identifica la clave sin revelarla. Si la clave cambia, los documentos existentes no se podrán leer.</p>
+  <p class="ayuda">La huella identifica la clave sin revelarla. Si la clave cambia, los mensajes existentes no se podrán leer.</p>
 
   <h2>Límites conocidos</h2>
   <ul class="lista">
-    <li>Quien tenga la clave maestra puede leer todos los documentos. Por eso no debe estar en el código ni en el respaldo de la base de datos.</li>
-    <li>Si olvidas tu contraseña no podrás firmar, porque tu llave privada no se puede recuperar.</li>
+    <li>Quien tenga la clave maestra puede leer todos los mensajes. El cifrado protege los datos en reposo, no convierte a Bóveda en un sistema de extremo a extremo.</li>
+    <li>Si olvidas tu contraseña no podrás firmar mensajes, porque tu llave privada no se puede recuperar.</li>
+    <li>Eliminar un mensaje lo borra para el remitente y para el destinatario.</li>
+    <li>El remitente o el destinatario pueden descargar un comprobante antes de borrarlo; ese comprobante conserva la prueba del texto original.</li>
     <li>La aplicación corre en HTTP local. En un servidor real, pon TLS delante y activa <code>BOVEDA_COOKIES_SEGURAS=1</code>.</li>
   </ul>
 </article>

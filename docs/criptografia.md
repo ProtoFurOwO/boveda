@@ -4,11 +4,12 @@ Este documento explica qué protege cada mecanismo, cómo funciona, dónde vive 
 
 ## 1. Objetivo
 
-Bóveda protege documentos sensibles frente a tres amenazas:
+Bóveda es una aplicación de mensajería entre usuarios. Protege los mensajes frente a cuatro amenazas:
 
-1. Alguien obtiene la base de datos y quiere leer los documentos.
-2. Alguien altera un documento y quiere que no se note.
-3. Alguien se hace pasar por el autor de un documento o de un certificado.
+1. Alguien obtiene la base de datos y quiere leer los mensajes.
+2. Alguien altera un mensaje y quiere que no se note.
+3. Alguien se hace pasar por el remitente de un mensaje o de un comprobante.
+4. Un usuario quiere leer un mensaje que no es suyo.
 
 ## 2. Componentes
 
@@ -19,8 +20,8 @@ Bóveda protege documentos sensibles frente a tres amenazas:
 | `boveda/criptografia/asimetrico.py` | Ed25519: generación de llaves, envoltura, firma, verificación y canonización |
 | `boveda/criptografia/contrasenas.py` | scrypt: hash de contraseñas y derivación de la clave de envoltura |
 | `boveda/servicios/usuarios.py` | Alta, autenticación y desbloqueo de la llave de firma |
-| `boveda/servicios/documentos.py` | Cifrado al guardar, descifrado al leer, firma y estado de la firma |
-| `boveda/servicios/certificados.py` | Formato del documento firmado y validación de certificados |
+| `boveda/servicios/mensajes.py` | Cifrado al enviar, descifrado al leer, firma y control de acceso |
+| `boveda/servicios/comprobantes.py` | Formato del mensaje firmado y validación de comprobantes |
 
 La capa de servicios no depende de Flask. Eso permite probar la criptografía sin levantar un servidor.
 
@@ -34,10 +35,10 @@ variable de entorno BOVEDA_CLAVE_MAESTRA   o   secretos/clave_maestra.key
                 HKDF-SHA256 (info = "boveda/<propósito>")
               ┌──────────┴───────────┐
        clave de datos          clave de sesión
-    (propósito: datos-documentos)  (propósito: sesion-web)
+  (propósito: datos-mensajes)  (propósito: sesion-web)
               │                      │
-   AES-256-GCM sobre título     firma de cookies de sesión
-   y contenido de documentos    (Flask / itsdangerous)
+   AES-256-GCM sobre asunto     firma de cookies de sesión
+   y cuerpo de los mensajes     (Flask / itsdangerous)
 
 contraseña del usuario ──scrypt (sal_llave)──► KEK (256 bits, solo en memoria)
 KEK ──AES-256-GCM (AAD "llave-firma|<usuario>")──► llave privada Ed25519 (en la BD)
@@ -49,7 +50,7 @@ La clave maestra tiene 256 bits de entropía aleatoria. Por eso HKDF puede usars
 
 ### Qué se cifra
 
-- El título y el contenido de cada documento.
+- El asunto y el cuerpo de cada mensaje.
 - La llave privada de firma de cada usuario, dentro de la base de datos.
 
 ### Formato almacenado
@@ -64,15 +65,15 @@ El prefijo `v1` permite cambiar de algoritmo en el futuro sin romper los datos e
 
 Cada cifrado se autentica junto con un contexto que no se cifra:
 
-- Documento: `documento|<usuario_id>|<documento_id>|<titulo o contenido>`
+- Mensaje: `mensaje|<remitente_id>|<destinatario_id>|<mensaje_id>|<asunto o cuerpo>`
 - Llave de firma: `llave-firma|<usuario_id>`
 
-Si un cifrado se copia a otra fila o a otro campo, el contexto no coincide y el descifrado falla. La prueba `test_un_cifrado_no_se_puede_trasplantar_a_otro_documento` lo verifica.
+Si un cifrado se copia a otra fila, a otro destinatario o a otro campo, el contexto no coincide y el descifrado falla. La prueba `test_un_cifrado_no_se_puede_trasplantar_a_otro_mensaje` lo verifica.
 
 ### Por qué AES-GCM
 
 - Es un cifrado autenticado (AEAD): el mismo paso que descifra también detecta cualquier alteración.
-- Acepta datos asociados, que atan cada cifrado a su documento y campo.
+- Acepta datos asociados, que atan cada cifrado a su mensaje, remitente y destinatario.
 - El nonce de 96 bits se genera al azar en cada cifrado. NIST recomienda no superar 2³² cifrados con la misma clave cuando los nonces son aleatorios. Bóveda está muy por debajo de ese límite.
 
 Se descartó Fernet. Es más simple, pero no permite datos asociados y oculta el nonce y el formato.
@@ -90,38 +91,38 @@ Se descartó Fernet. Es más simple, pero no permite datos asociados y oculta el
 Un JSON canónico: claves ordenadas, sin espacios y en UTF-8.
 
 ```json
-{"autor":"ana","contenido":"...","creado_en":"2026-11-11T06:51:45+00:00",
- "documento":"61446d1a...","firmado_en":"2026-11-11T06:55:02+00:00",
- "titulo":"...","version":1}
+{"asunto":"Clave de la reunión","creado_en":"2026-11-11T07:10:00+00:00",
+ "cuerpo":"La clave es 4321","destinatario":"beto","firmado_en":"2026-11-11T07:10:00+00:00",
+ "mensaje":"cd9f0606...","remitente":"ana","version":1}
 ```
 
-Firma y verificación calculan exactamente los mismos bytes porque usan la misma función de canonización. Por eso el certificado puede verificarse en otra máquina.
+Firma y verificación calculan exactamente los mismos bytes porque usan la misma función de canonización. Por eso el comprobante puede verificarse en otra máquina.
 
-### Flujo de firma
+### Flujo de envío
 
-1. El usuario escribe su contraseña.
+1. El remitente elige un destinatario registrado y escribe su contraseña.
 2. Se deriva la KEK con scrypt y la sal del usuario.
-3. Se descifra la llave privada con la KEK. Si la contraseña es incorrecta, la etiqueta de GCM no coincide y la firma se rechaza.
-4. Se descifran título y contenido, y se construye el payload canónico con la fecha de firma.
-5. Ed25519 firma el payload. La firma y la fecha se guardan en el documento.
-6. La referencia a la llave privada se descarta. Python no garantiza borrar la memoria de inmediato, así que esto es una limitación conocida.
+3. Se descifra la llave privada con la KEK. Si la contraseña es incorrecta, la etiqueta de GCM no coincide y el envío se rechaza antes de guardar nada.
+4. Se cifran asunto y cuerpo con AES-256-GCM.
+5. Se construye el payload canónico y se firma con Ed25519.
+6. Se guarda el mensaje cifrado, la firma y la fecha. La llave privada no se guarda.
 
-### Flujo de verificación
+### Flujo de lectura
 
-La verificación no pide contraseña. Usa la clave pública registrada del autor:
+Solo el remitente o el destinatario pueden pedir el mensaje; el resto recibe un 404. Para quien sí puede:
 
-1. Se descifran título y contenido.
+1. Se descifran asunto y cuerpo.
 2. Se reconstruye el payload canónico con los datos actuales de la base de datos.
-3. Ed25519 verifica la firma. Si el contenido, el autor o la fecha cambiaron, falla.
+3. Ed25519 verifica la firma con la clave pública registrada del remitente. Si el contenido, el remitente, el destinatario o la fecha cambiaron, falla.
 
-### Certificados
+### Comprobantes
 
-Un certificado es el payload más la firma, la clave pública del autor y su huella SHA-256. Quien lo recibe puede verificarlo sin la aplicación:
+Un comprobante es el payload más la firma, la clave pública del remitente y su huella SHA-256. Lo puede descargar el remitente o el destinatario. Quien lo recibe puede verificarlo sin la aplicación:
 
-- Con `--clave-publica`, compara la huella del certificado con la clave que él mismo obtuvo de una fuente de confianza. Si no coincide, el certificado es falso aunque la firma sea válida. Eso prueba autoría.
-- Sin esa opción, solo comprueba que la firma coincide con la clave incluida en el propio certificado. Eso prueba integridad, pero no quién firmó.
+- Con `--clave-publica`, compara la huella del comprobante con la clave que él mismo obtuvo de una fuente de confianza. Si no coincide, el comprobante es falso aunque la firma sea válida. Eso prueba autoría.
+- Sin esa opción, solo comprueba que la firma coincide con la clave incluida en el propio comprobante. Eso prueba integridad, pero no quién lo envió.
 
-En la verificación pública de la aplicación, la clave de confianza es la registrada en la tabla de usuarios.
+En la verificación pública de la aplicación, la clave de confianza es la registrada en la tabla de usuarios para el remitente.
 
 ## 6. Contraseñas (scrypt)
 
@@ -148,41 +149,43 @@ La aplicación nunca escribe la clave en logs, en la base de datos ni en las pá
 
 ### Respaldo y pérdida
 
-Sin la clave maestra no se pueden leer los documentos. Respáldala fuera del proyecto. Si cambia, la aplicación sigue funcionando, pero los documentos existentes no se descifran y aparecen como alterados.
+Sin la clave maestra no se pueden leer los mensajes. Respáldala fuera del proyecto. Si cambia, la aplicación sigue funcionando, pero los mensajes existentes no se descifran y aparecen como alterados.
 
 ### Lo que no está implementado
 
-- Rotación de la clave maestra. Haría falta re-cifrar todos los documentos con la clave nueva.
-- Recuperación de contraseñas. Como la llave privada depende de la contraseña, un usuario que la olvida ya no puede firmar. Los documentos firmados antes siguen verificándose con su clave pública.
+- Rotación de la clave maestra. Haría falta re-cifrar todos los mensajes con la clave nueva.
+- Recuperación de contraseñas. Como la llave privada depende de la contraseña, un usuario que la olvida ya no puede firmar mensajes nuevos. Los comprobantes descargados antes siguen verificándose con su clave pública.
 - Un HSM o un KMS en la nube. El código los permitiría: solo habría que cambiar la función `cargar_clave_maestra`.
 
 ## 8. Modelo de amenazas
 
 | Amenaza | Qué pasaría | Mitigación | Límite |
 |---|---|---|---|
-| Robo del archivo `data/boveda.db` | El atacante ve usuarios, hashes, llaves privadas envueltas y documentos cifrados | Contenido en AES-256-GCM. Hashes con scrypt. Llaves privadas cifradas con la contraseña. La clave maestra no está en la base de datos. | Una contraseña débil se puede adivinar sin conexión. scrypt encarece cada intento, pero no lo impide. |
-| Alteración de un documento en la base de datos sin la clave maestra | Se corrompe el cifrado | AES-GCM detecta la corrupción al descifrar | Ninguno para este caso |
-| Alteración con la clave maestra (cambiar el texto y volver a cifrarlo) | El descifrado funciona y el texto cambió | La firma Ed25519 no coincide y el sello muestra *Alterado* | Si alguien borra la firma, el documento queda como *Sin firmar*. Un certificado emitido antes conserva la prueba del texto original. |
-| Copiar un cifrado a otro documento o campo | El texto aparece en otro lugar | Datos asociados con usuario, documento y campo | Ninguno para este caso |
-| Falsificar una firma sin conocer la contraseña | El atacante quiere firmar como otro usuario | La llave privada solo se abre con la contraseña | Quien conozca la contraseña del autor puede firmar |
-| Certificado falso con una llave propia | El verificador ve una firma válida | La verificación pública exige que la clave coincida con la registrada del autor | Sin la aplicación, el verificador debe conseguir la clave del autor por otra vía |
-| Fuga de la clave maestra | Se descifran todos los documentos y se pueden alterar | La clave vive fuera del código y de la base de datos, con permisos restringidos | Una sola clave raíz. No hay rotación. |
+| Robo del archivo `data/boveda.db` | El atacante ve usuarios, hashes, llaves privadas envueltas y mensajes cifrados | Contenido en AES-256-GCM. Hashes con scrypt. Llaves privadas cifradas con la contraseña. La clave maestra no está en la base de datos. | Una contraseña débil se puede adivinar sin conexión. scrypt encarece cada intento, pero no lo impide. |
+| Alteración de un mensaje en la base de datos sin la clave maestra | Se corrompe el cifrado | AES-GCM detecta la corrupción al descifrar | Ninguno para este caso |
+| Alteración con la clave maestra (cambiar el texto y volver a cifrarlo) | El descifrado funciona y el texto cambió | La firma Ed25519 no coincide y el sello muestra *Alterado* | Si alguien borra la firma, el mensaje queda como *Sin firma*. Un comprobante emitido antes conserva la prueba del texto original. |
+| Copiar un cifrado a otro mensaje o campo | El texto aparece en otro lugar | Datos asociados con remitente, destinatario, mensaje y campo | Ninguno para este caso |
+| Falsificar una firma sin conocer la contraseña | El atacante quiere enviar como otro usuario | La llave privada solo se abre con la contraseña | Quien conozca la contraseña del remitente puede firmar |
+| Comprobante falso con una llave propia | El verificador ve una firma válida | La verificación pública exige que la clave coincida con la registrada del remitente | Sin la aplicación, el verificador debe conseguir la clave del remitente por otra vía |
+| Tercer usuario pide un mensaje ajeno por su identificador (IDOR) | Querría leer un mensaje que no es suyo | Todas las consultas filtran por remitente o destinatario. Responde 404. | Ninguno para este caso |
+| Fuga de la clave maestra | Se descifran todos los mensajes y se pueden alterar | La clave vive fuera del código y de la base de datos, con permisos restringidos | Una sola clave raíz. No hay rotación. El servidor puede leer los mensajes: es cifrado en reposo, no extremo a extremo. |
 | Fuerza bruta contra el inicio de sesión | Intentos repetidos de contraseña | scrypt hace cada intento costoso | No hay límite de intentos ni bloqueo temporal |
 | Inyección de scripts (XSS) | Código ajeno se ejecuta en el navegador | Autoescape de Jinja2. CSP sin scripts en línea. | Ninguno para este caso |
 | Falsificación de peticiones (CSRF) | Un sitio ajeno envía formularios en nombre del usuario | Token por sesión comparado en tiempo constante. `SameSite=Lax` en la cookie. | Ninguno para este caso |
 | Incrustación en otro sitio (clickjacking) | La página se muestra dentro de un iframe | `X-Frame-Options: DENY` y `frame-ancestors 'none'` | Ninguno para este caso |
 | Robo de la cookie de sesión | Un tercero entra como el usuario | `HttpOnly`, `SameSite=Lax`, expiración tras 60 minutos de inactividad y `Secure` configurable | Sin HTTPS en local, la cookie viaja en claro por la red |
-| Lectura de documentos de otro usuario (IDOR) | Un usuario pide el identificador de otro | Todas las consultas filtran por usuario. Responde 404 si no es suyo. | Ninguno para este caso |
-| Enumeración de usuarios | Saber qué cuentas existen | El inicio de sesión tarda lo mismo para usuarios inexistentes | El registro sí revela si un nombre está ocupado |
+| Enumeración de usuarios | Saber qué cuentas existen | El inicio de sesión tarda lo mismo para usuarios inexistentes | El formulario de mensaje nuevo muestra los usuarios registrados como posibles destinatarios |
+| Eliminación de un mensaje | Perder la prueba del contenido | El remitente o el destinatario pueden descargar el comprobante antes de borrarlo | Borrar elimina el mensaje para ambos; solo el comprobante externo conserva la prueba |
 
 ## 9. Decisiones y alternativas
 
 | Decisión | Alternativa descartada | Motivo |
 |---|---|---|
-| AES-256-GCM con datos asociados | Fernet | Fernet no permite datos asociados, así que no ata cada cifrado a su documento |
+| AES-256-GCM con datos asociados | Fernet | Fernet no permite datos asociados, así que no ata cada cifrado a su mensaje y destinatario |
 | Ed25519 | RSA-2048 o RSA-PSS | Claves y firmas más pequeñas, firmas deterministas y un estándar moderno (RFC 8032). RSA-PSS también sería válido. |
-| Una llave de firma por usuario | Una sola llave del servidor | La firma prueba autoría, no solo que el sistema emitió el documento |
+| Una llave de firma por usuario | Una sola llave del servidor | La firma prueba autoría, no solo que el sistema emitió el mensaje |
 | Llave privada cifrada con la contraseña | Llave privada cifrada solo con la clave maestra | Quien tenga la clave maestra no puede firmar como el usuario sin conocer su contraseña |
+| Mensajes inmutables | Permitir editar | Un mensaje editado dejaría de ser una prueba de lo que se dijo; para corregir se envía otro |
 | Cookie de sesión firmada por Flask | JWT firmado con EdDSA | Un JWT sería un tercer mecanismo fuera del alcance. La sesión ya está firmada y expira. |
 | Clave de sesión derivada con HKDF | Variable de entorno aparte para `SECRET_KEY` | Una sola raíz de confianza: la clave maestra |
 | waitress como servidor | Servidor de desarrollo de Flask | waitress es un servidor WSGI de producción que funciona en Windows, Linux y macOS |
@@ -190,10 +193,10 @@ Sin la clave maestra no se pueden leer los documentos. Respáldala fuera del pro
 
 ## 10. Verificación
 
-- **Pruebas automáticas:** 44 pruebas con `python -m pytest`. Cubren cifrado, firma, claves, servicios, certificados y el flujo web.
-- **Demostración en consola:** `python scripts/demostracion.py` recorre el flujo completo con una base y una clave temporales.
-- **Demostración en la aplicación:** los scripts `manipular_documento.py` y `verificar_certificado.py` simulan ataques sobre la base real y sobre certificados.
-- **Revisión visual:** se recorrieron las pantallas principales en un navegador, con y sin firma, con un documento alterado y en vista móvil.
+- **Pruebas automáticas:** 44 pruebas con `python -m pytest`. Cubren cifrado, firma, claves, servicios, comprobantes y el flujo web.
+- **Demostración en consola:** `python scripts/demostracion.py` recorre el envío entre dos usuarios con una base y una clave temporales.
+- **Demostración en la aplicación:** los scripts `manipular_mensaje.py` y `verificar_comprobante.py` simulan ataques sobre la base real y sobre comprobantes.
+- **Revisión visual:** se recorrieron la bandeja, el envío y el mensaje firmado en un navegador. La alteración y la verificación pública se cubren con las pruebas automáticas.
 
 ## 11. Referencias
 

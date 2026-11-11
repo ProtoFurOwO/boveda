@@ -59,6 +59,10 @@ def buscar_por_id(db, usuario_id: str):
     return db.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
 
 
+def listar(db):
+    return db.execute("SELECT * FROM usuarios ORDER BY nombre").fetchall()
+
+
 def buscar_por_nombre(db, nombre: str):
     return db.execute("SELECT * FROM usuarios WHERE nombre = ?", (nombre.strip().lower(),)).fetchone()
 
