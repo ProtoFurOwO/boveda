@@ -18,7 +18,7 @@ Necesitas Python 3.10 o superior. Está probado en Windows con Python 3.13.
 **Windows (PowerShell)**
 
 ```powershell
-git clone https://github.com/TU_USUARIO/boveda.git
+git clone https://github.com/ProtoFurOwO/boveda.git
 cd boveda
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -31,7 +31,7 @@ Si PowerShell bloquea la activación del entorno, ejecuta una vez `Set-Execution
 **Linux y macOS**
 
 ```bash
-git clone https://github.com/TU_USUARIO/boveda.git
+git clone https://github.com/ProtoFurOwO/boveda.git
 cd boveda
 python3 -m venv .venv
 source .venv/bin/activate
@@ -186,19 +186,18 @@ La clave maestra se busca primero en la variable de entorno y después en el arc
 - **Servidor:** genera una clave con `python scripts/generar_clave_maestra.py` y guárdala en el gestor de secretos del servicio (variables del servicio, Azure Key Vault, AWS Secrets Manager o HashiCorp Vault). No la dejes en disco.
 - **Estado actual:** la página *Seguridad* muestra de dónde se cargó la clave y su huella. Nunca muestra la clave.
 
-## Publicar el proyecto
+## Repositorio
 
-Para que otra persona vea el código:
+El código está publicado en <https://github.com/ProtoFurOwO/boveda>.
 
-1. Crea un repositorio vacío en GitHub.
-2. En la carpeta del proyecto:
+Para clonarlo:
 
-   ```bash
-   git remote add origin https://github.com/TU_USUARIO/boveda.git
-   git push -u origin main
-   ```
+```bash
+git clone https://github.com/ProtoFurOwO/boveda.git
+cd boveda
+```
 
-3. Quien lo reciba clona el repo, instala y ejecuta con los comandos de arriba. La app corre en `http://127.0.0.1:5000` de esa máquina.
+Después instala y ejecuta con los comandos de [Ejecutar en local](#ejecutar-en-local). La app corre en `http://127.0.0.1:5000` de esa máquina.
 
 Cada instalación tiene su propia base de datos y su propia clave maestra: un clon nuevo no ve tus mensajes. Para que otra persona use tu instancia, compártele una URL de tu servidor o de tu red. Para que verifique un comprobante emitido en tu instancia, pásale el `.json` y la clave pública del remitente; el script `verificar_comprobante.py` funciona sin tu base de datos.
 
