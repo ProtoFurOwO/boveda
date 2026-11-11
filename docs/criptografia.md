@@ -223,6 +223,7 @@ Sin la clave maestra no se pueden leer los mensajes. Respáldala fuera del proye
 - **Demostración en la aplicación:** los scripts `manipular_mensaje.py` y `verificar_comprobante.py` simulan ataques sobre la base real y sobre comprobantes.
 - **Revisión visual:** se recorrieron la bandeja, el envío y el mensaje firmado en un navegador. La alteración y la verificación pública se cubren con las pruebas automáticas.
 - **Revisión del enlace público:** se comprobó por HTTP el estado 200, las cabeceras de privacidad, la alteración y la revocación; `tests/test_compartidos.py` cubre el resto.
+- **Inspección de la base:** `python scripts/inspeccionar_bd.py usuarios|mensajes|compartidos|buscar|esquema` muestra hashes, llaves cifradas, firmas y enlaces, y comprueba que una marca no aparece en claro en el volcado lógico.
 
 ## 12. Referencias
 

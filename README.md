@@ -134,6 +134,30 @@ Prueba también:
 - revocar el enlace y recargar → **404**;
 - abrir `/mensajes/<id>` sin ser remitente ni destinatario → **404** o login (el enlace es la única vía pública).
 
+## Inspeccionar la base de datos
+
+Para demostrar que el mensaje se guarda cifrado y que las llaves están donde deben:
+
+```bash
+python scripts/inspeccionar_bd.py
+python scripts/inspeccionar_bd.py usuarios
+python scripts/inspeccionar_bd.py mensajes --completo
+python scripts/inspeccionar_bd.py compartidos
+python scripts/inspeccionar_bd.py buscar "CLAVE-SECRETA-4321"
+python scripts/inspeccionar_bd.py esquema
+```
+
+- `resumen`: conteos de usuarios, mensajes y enlaces.
+- `usuarios`: hash de contraseña, sal, llave pública y llave privada cifrada.
+- `mensajes`: remitente, destinatario, asunto/cuerpo cifrados, firma y fecha.
+- `compartidos`: hash del token, creador, caducidad y revocación.
+- `buscar`: comprueba que una marca única no aparece en el volcado lógico de la base.
+- `esquema`: columnas de las tablas.
+
+La base por defecto es `data/boveda.db`. Si usas otra, define `BOVEDA_BASE_DATOS`. La clave maestra no está en la base y el script nunca la muestra.
+
+Para la demo, crea un mensaje con una marca única como `CLAVE-SECRETA-4321` y ejecuta `buscar "CLAVE-SECRETA-4321"`: debe decir **“No aparece en claro”**.
+
 ## Mecanismos criptográficos
 
 ### 1. Cifrado simétrico: AES-256-GCM
