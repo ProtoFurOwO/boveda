@@ -1,0 +1,21 @@
+# Entornos virtuales y cachés de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Datos locales y secretos: nunca se versionan
+data/
+secretos/*
+!secretos/README.md
+*.db
+*.key
+.env
+certificado-*.json
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
