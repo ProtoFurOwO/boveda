@@ -65,10 +65,10 @@ La primera vez que arranca, Bóveda genera la clave maestra en `secretos/clave_m
 
    AES-GCM detecta la corrupción y el contenido ya no se puede descifrar.
 
-7. **Verifica el certificado sin la aplicación:**
+7. **Verifica el certificado sin la aplicación.** Usa el archivo que descargaste, por ejemplo `certificado-1a2b3c4d.json`:
 
    ```bash
-   python scripts/verificar_certificado.py certificado.json
+   python scripts/verificar_certificado.py certificado-1a2b3c4d.json
    ```
 
    Devuelve `[OK]` con código de salida 0. Si editas el JSON, devuelve `[FALLO]` con código 1.
