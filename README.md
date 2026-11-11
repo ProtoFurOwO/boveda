@@ -50,7 +50,7 @@ La primera vez que arranca, Bóveda genera la clave maestra en `secretos/clave_m
 3. Ana le escribe un mensaje a Beto y confirma **su contraseña**. Bóveda desbloquea su llave privada, cifra el mensaje con AES-256-GCM y lo firma con Ed25519.
 4. La base de datos guarda **solo el cifrado** y la firma.
 5. Beto abre el mensaje: Bóveda lo descifra y verifica la firma con la llave pública de Ana. El sello dice **Firmado**.
-6. Beto descarga un **comprobante** (.json) con el texto firmado. Cualquiera puede verificarlo en *Verificar comprobante* sin cuenta.
+6. Beto descarga un **comprobante** (.json) con el texto firmado. Cualquiera puede verificarlo en *Verificar comprobante* de esta instalación sin cuenta. Si el comprobante viene de otra instalación, se verifica con `scripts/verificar_comprobante.py` y la clave pública del remitente.
 7. Si alguien cambia el mensaje en la base de datos, el sello pasa a **Alterado**.
 
 ## Recorrido de demostración
@@ -58,7 +58,7 @@ La primera vez que arranca, Bóveda genera la clave maestra en `secretos/clave_m
 1. Crea **dos cuentas** (por ejemplo `ana` y `beto`), en dos ventanas o cerrando sesión entre una y otra.
 2. Entra como `ana`, pulsa **Escribir mensaje**, elige `beto`, escribe un asunto y un texto, y confirma tu contraseña. Abre *Lo que se guarda en la base de datos*: solo se ve texto cifrado.
 3. Entra como `beto`: el mensaje aparece en **Recibidos** con el sello *Firmado*. Ábrelo y descarga el **comprobante**.
-4. En una ventana privada, entra a *Verificar comprobante* y sube el `.json`. Dice **Auténtico** sin pedir cuenta.
+4. En una ventana privada de esta misma instalación, entra a *Verificar comprobante* y sube el `.json`. Dice **Auténtico** sin pedir cuenta.
 5. Simula a un atacante con la clave maestra que cambia el texto directamente en la base de datos:
 
    ```bash
@@ -113,7 +113,7 @@ Al registrarse, cada usuario recibe un par de llaves Ed25519. Firma los mensajes
 - **Quién puede firmar:** solo el remitente, y firmar exige confirmar su contraseña, que desbloquea la llave privada.
 - **Cuándo se verifica:** cada vez que se abre el mensaje, con la clave pública registrada del remitente. No requiere contraseña.
 - **Qué invalida la firma:** cualquier cambio en el contenido o en sus metadatos. Los mensajes no se editan.
-- **Comprobantes:** el JSON descargable contiene el texto firmado, la firma y la clave pública del remitente. Quien lo recibe puede verificarlo con `scripts/verificar_comprobante.py`, sin acceder a la aplicación.
+- **Comprobantes:** el JSON descargable contiene el texto firmado, la firma y la clave pública del remitente. Quien lo recibe puede verificarlo con `scripts/verificar_comprobante.py`, sin acceder a la aplicación. La página *Verificar comprobante* de la app usa la clave registrada en esa instalación; para un comprobante de otra instalación, usa el script.
 - **Código:** `boveda/criptografia/asimetrico.py` y `boveda/servicios/comprobantes.py`.
 
 ### Mecanismos de apoyo
@@ -154,6 +154,8 @@ Para que otra persona lo vea:
    ```
 
 3. Quien lo reciba clona el repo, instala y ejecuta con los comandos de arriba. La app corre en `http://127.0.0.1:5000` de esa máquina.
+
+Cada instalación tiene su propia base de datos y su propia clave maestra: un clon nuevo no ve tus mensajes. Para que otra persona use tu instancia, compártele una URL de tu servidor o de tu red. Para que verifique un comprobante emitido en tu instancia, pásale el `.json` y la clave pública del remitente; el script `verificar_comprobante.py` funciona sin tu base de datos.
 
 Para mostrarla desde otro equipo de la misma red (por ejemplo, el del profesor):
 

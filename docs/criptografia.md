@@ -122,7 +122,7 @@ Un comprobante es el payload más la firma, la clave pública del remitente y su
 - Con `--clave-publica`, compara la huella del comprobante con la clave que él mismo obtuvo de una fuente de confianza. Si no coincide, el comprobante es falso aunque la firma sea válida. Eso prueba autoría.
 - Sin esa opción, solo comprueba que la firma coincide con la clave incluida en el propio comprobante. Eso prueba integridad, pero no quién lo envió.
 
-En la verificación pública de la aplicación, la clave de confianza es la registrada en la tabla de usuarios para el remitente.
+En la verificación pública de la aplicación, la clave de confianza es la registrada en la tabla de usuarios para el remitente. Por eso esa página sirve para comprobantes de la misma instalación. Si el comprobante viene de otra instalación, el remitente no estará registrado allí: se usa `scripts/verificar_comprobante.py` con la clave pública del remitente como fuente de confianza.
 
 ## 6. Contraseñas (scrypt)
 
