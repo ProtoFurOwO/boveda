@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sello %}
+{% block titulo %}{{ doc.titulo }}{% endblock %}
+{% block contenido %}
+<div class="detalle">
+  <article class="hoja hoja--documento">
+    <header class="doc__cabecera">
+      <div>
+        <h1>{{ doc.titulo }}</h1>
+        <p class="doc__meta">Creado el {{ doc.creado_en|fecha }}. Última edición: {{ doc.actualizado_en|fecha }}.</p>
+      </div>
+      {{ sello(doc.estado_firma, grande=True, animado=(doc.estado_firma == 'valida')) }}
+    </header>
+
+    {% if doc.descifrable %}
+      <div class="doc__texto">{{ doc.contenido }}</div>
+    {% else %}
+      <p class="aviso aviso--error">{{ doc.motivo_firma }}</p>
+    {% endif %}
+
+    <footer class="doc__acciones">
+      {% if doc.descifrable %}
+        <a class="boton boton--secundario" href="{{ url_for('documentos.editar', documento_id=doc.id) }}">Editar</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('documentos.eliminar', documento_id=doc.id) }}" class="en-linea" data-confirmar="Se eliminarán el documento y su firma. ¿Quieres continuar?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="boton boton--peligro" type="submit">Eliminar</button>
+      </form>
+    </footer>
+  </article>
+
+  <aside class="lateral" aria-labelledby="titulo-firma">
+    <section class="panel">
+      <h2 id="titulo-firma">Firma digital</h2>
+      {% if doc.descifrable %}
+        <p class="estado-firma">{{ doc.motivo_firma }}</p>
+      {% endif %}
+      {% if doc.firmado_en %}
+        <dl class="datos">
+          <dt>Firmado</dt>
+          <dd>{{ doc.firmado_en|fecha }}</dd>
+          <dt>Autor</dt>
+          <dd>{{ doc.autor }}</dd>
+          <dt>Algoritmo</dt>
+          <dd>Ed25519</dd>
+          <dt>Huella de la clave</dt>
+          <dd class="mono">{{ doc.huella|huella }}</dd>
+        </dl>
+      {% endif %}
+      {% if doc.estado_firma == 'valida' %}
+        <a class="boton boton--secundario boton--ancho" href="{{ url_for('documentos.certificado', documento_id=doc.id) }}">Descargar certificado (.json)</a>
+      {% endif %}
+    </section>
+
+    {% if doc.descifrable %}
+      <section class="panel">
+        <h2>{{ 'Volver a firmar' if doc.firma else 'Firmar documento' }}</h2>
+        <p class="ayuda">Confirma tu contraseña para desbloquear tu llave privada. Solo se usa para esta firma.</p>
+        <form method="post" action="{{ url_for('documentos.firmar', documento_id=doc.id) }}" class="formulario">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="text" name="usuario" value="{{ usuario['nombre'] }}" autocomplete="username" hidden>
+          <label class="campo">
+            <span>Contraseña</span>
+            <input class="input" type="password" name="contrasena" autocomplete="current-password" required maxlength="128">
+          </label>
+          <button class="boton boton--primario boton--ancho" type="submit">{{ 'Volver a firmar' if doc.firma else 'Firmar documento' }}</button>
+        </form>
+      </section>
+    {% endif %}
+  </aside>
+</div>
+
+<details class="tecnico">
+  <summary>Lo que se guarda en la base de datos</summary>
+  <ol class="ciclo">
+    <li>Escribes el documento en claro.</li>
+    <li>AES-256-GCM cifra el título y el texto con una clave derivada de la clave maestra.</li>
+    <li>La base de datos guarda solo el cifrado. El texto nunca se escribe en disco.</li>
+    <li>Al abrir el documento se descifra y se comprueba que nadie lo alteró.</li>
+  </ol>
+  <dl class="tecnico__datos">
+    <dt>Título cifrado</dt>
+    <dd><code class="cifrado">{{ doc.titulo_cifrado }}</code></dd>
+    <dt>Contenido cifrado</dt>
+    <dd><code class="cifrado">{{ doc.contenido_cifrado }}</code></dd>
+    <dt>Firma Ed25519 (base64)</dt>
+    <dd><code class="cifrado">{{ doc.firma or "Sin firma todavía" }}</code></dd>
+    <dt>Clave pública del autor</dt>
+    <dd><pre class="cifrado">{{ doc.clave_publica_pem }}</pre></dd>
+  </dl>
+</details>
+{% endblock %}

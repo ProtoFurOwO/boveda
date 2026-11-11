@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import sello %}
+{% block titulo %}Documentos{% endblock %}
+{% block contenido %}
+<div class="encabezado-pagina">
+  <div>
+    <h1>Documentos</h1>
+    <p class="muted">Solo tú puedes leerlos. Cada fila muestra el estado de su firma.</p>
+  </div>
+  <a class="boton boton--primario" href="{{ url_for('documentos.nuevo') }}">Nuevo documento</a>
+</div>
+
+{% if documentos %}
+  <ol class="archivo">
+    {% for d in documentos %}
+      <li class="archivo__fila">
+        <a class="archivo__titulo" href="{{ url_for('documentos.detalle', documento_id=d.id) }}">{{ d.titulo }}</a>
+        <div class="archivo__estado">
+          {{ sello(d.estado_firma, pequeno=True) }}
+          <time class="muted" datetime="{{ d.actualizado_en }}">{{ d.actualizado_en|fecha }}</time>
+        </div>
+        <p class="archivo__extracto">{{ d.contenido[:160] }}</p>
+      </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <div class="vacio">
+    <p>Aún no hay documentos. El primero se cifra antes de guardarse.</p>
+    <a class="boton boton--primario" href="{{ url_for('documentos.nuevo') }}">Crear documento</a>
+  </div>
+{% endif %}
+{% endblock %}

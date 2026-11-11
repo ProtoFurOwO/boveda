@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}{% endblock %} · Bóveda</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Ir al contenido</a>
+
+  <header class="cabecera">
+    <div class="cabecera__interior">
+      <a class="marca" href="{{ url_for('publico.inicio') }}">
+        <svg class="marca__icono" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M12 7.8V5.2M12 18.8v-2.6M7.8 12H5.2M18.8 12h-2.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <span>Bóveda</span>
+      </a>
+      <nav class="navegacion" aria-label="Principal">
+        {% if usuario %}
+          <a href="{{ url_for('documentos.lista') }}">Documentos</a>
+        {% endif %}
+        <a href="{{ url_for('publico.verificar') }}">Verificar certificado</a>
+        <a href="{{ url_for('publico.seguridad') }}">Seguridad</a>
+        {% if usuario %}
+          <form method="post" action="{{ url_for('auth.salir') }}" class="en-linea">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="enlace" type="submit">Salir de {{ usuario['nombre'] }}</button>
+          </form>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}">Entrar</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido" class="principal">
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% if mensajes %}
+        <div class="avisos" role="status">
+          {% for categoria, texto in mensajes %}
+            <p class="aviso aviso--{{ categoria }}">{{ texto }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="pie">
+    <div class="pie__interior">
+      Hecho para la práctica de seguridad en cómputo. Cifrado con AES-256-GCM, firmas con Ed25519 y contraseñas con scrypt.
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titulo %}Verificar certificado{% endblock %}
+{% block contenido %}
+<div class="verificar">
+  <section class="hoja hoja--form">
+    <h1>Verificar un certificado</h1>
+    <p class="ayuda">
+      Sube el archivo .json que descargaste de un documento firmado. Bóveda compara su firma con la clave pública
+      registrada del autor. No necesitas tener cuenta.
+    </p>
+    <form method="post" enctype="multipart/form-data" class="formulario">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="campo">
+        <span>Archivo de certificado</span>
+        <input class="input" type="file" name="certificado" accept=".json,application/json" required>
+      </label>
+      <button class="boton boton--primario" type="submit">Verificar certificado</button>
+    </form>
+  </section>
+
+  {% if resultado %}
+    <section class="resultado" aria-live="polite">
+      {% if resultado.valido %}
+        <span class="sello sello--ok sello--grande sello--animado">Auténtico</span>
+        <h2>El documento no cambió después de firmarse</h2>
+      {% else %}
+        <span class="sello sello--error sello--grande sello--animado">No verificado</span>
+        <h2>No se pudo confirmar este certificado</h2>
+        <p>{{ resultado.mensaje }}</p>
+      {% endif %}
+      <dl class="datos">
+        <dt>Documento</dt>
+        <dd>{{ resultado.payload.titulo }}</dd>
+        <dt>Autor</dt>
+        <dd>{{ resultado.payload.autor }}</dd>
+        <dt>Firmado</dt>
+        <dd>{{ resultado.payload.firmado_en|fecha }}</dd>
+      </dl>
+      <details class="tecnico">
+        <summary>Contenido que figura en el certificado</summary>
+        <div class="doc__texto doc__texto--pequeno">{{ resultado.payload.contenido }}</div>
+      </details>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

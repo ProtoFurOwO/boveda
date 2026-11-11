@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Crear cuenta{% endblock %}
+{% block contenido %}
+<section class="acceso">
+  <div>
+    <h1 class="acceso__titular">Tu contraseña también protege tu llave de firma.</h1>
+    <p class="acceso__detalle">
+      Al crear la cuenta se genera un par de llaves Ed25519. La llave privada se guarda cifrada con una clave
+      derivada de tu contraseña. Sin ella no se puede firmar, y el servidor tampoco puede abrirla.
+    </p>
+  </div>
+  <form method="post" class="hoja formulario">
+    <h2>Crear cuenta</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="campo">
+      <span>Usuario</span>
+      <input class="input" name="nombre" value="{{ nombre }}" autocomplete="username" required minlength="3" maxlength="32" autofocus>
+      <small class="ayuda">De 3 a 32 caracteres: letras, números, punto, guion o guion bajo.</small>
+    </label>
+    <label class="campo">
+      <span>Contraseña</span>
+      <input class="input" type="password" name="contrasena" autocomplete="new-password" required minlength="10" maxlength="128">
+      <small class="ayuda">Mínimo 10 caracteres. Si la olvidas, no podrás firmar documentos.</small>
+    </label>
+    <label class="campo">
+      <span>Repite la contraseña</span>
+      <input class="input" type="password" name="confirmacion" autocomplete="new-password" required minlength="10" maxlength="128">
+    </label>
+    <button class="boton boton--primario boton--ancho" type="submit">Crear cuenta y generar llaves</button>
+    <p class="ayuda">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}">Entrar</a></p>
+  </form>
+</section>
+{% endblock %}

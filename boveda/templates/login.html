@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titulo %}Entrar{% endblock %}
+{% block contenido %}
+<section class="acceso">
+  <div>
+    <h1 class="acceso__titular">Lo que escribes se cifra antes de tocar el disco.</h1>
+    <p class="acceso__detalle">
+      Bóveda guarda tus documentos con AES-256-GCM y los sella con una firma Ed25519.
+      Solo tú, con tu contraseña, puedes firmar. Cualquiera puede comprobar un certificado sin entrar a tu cuenta.
+    </p>
+  </div>
+  <form method="post" class="hoja formulario">
+    <h2>Entrar</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="campo">
+      <span>Usuario</span>
+      <input class="input" name="nombre" value="{{ nombre }}" autocomplete="username" required maxlength="32" autofocus>
+    </label>
+    <label class="campo">
+      <span>Contraseña</span>
+      <input class="input" type="password" name="contrasena" autocomplete="current-password" required maxlength="128">
+    </label>
+    <button class="boton boton--primario boton--ancho" type="submit">Entrar</button>
+    <p class="ayuda">¿Aún no tienes cuenta? <a href="{{ url_for('auth.registro') }}">Crear cuenta</a></p>
+  </form>
+</section>
+{% endblock %}

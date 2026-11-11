@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar documento' if documento else 'Nuevo documento' }}{% endblock %}
+{% block contenido %}
+<section class="hoja hoja--form">
+  <h1>{{ 'Editar documento' if documento else 'Nuevo documento' }}</h1>
+  <p class="ayuda">
+    El título y el texto se cifran con AES-256-GCM antes de guardarse.
+    {% if documento and documento.firma %}Al cambiar el texto, la firma actual deja de ser válida.{% endif %}
+  </p>
+  <form method="post" class="formulario" action="{{ url_for('documentos.editar', documento_id=documento.id) if documento else url_for('documentos.nuevo') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="campo">
+      <span>Título</span>
+      <input class="input" name="titulo" value="{{ valores.titulo }}" maxlength="120" required autofocus>
+    </label>
+    <label class="campo">
+      <span>Texto</span>
+      <textarea class="area" name="contenido" rows="16" maxlength="20000">{{ valores.contenido }}</textarea>
+    </label>
+    <div class="acciones">
+      <button class="boton boton--primario" type="submit">Guardar cifrado</button>
+      <a class="boton boton--texto" href="{{ url_for('documentos.detalle', documento_id=documento.id) if documento else url_for('documentos.lista') }}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
